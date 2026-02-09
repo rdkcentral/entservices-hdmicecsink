@@ -19,7 +19,6 @@
 
 #include "HdmiCecSink.h"
 
-#include "UtilsIarm.h"
 #include "UtilsJsonRpc.h"
 #include "UtilssyncPersistFile.h"
 #include "UtilsSearchRDKProfile.h"

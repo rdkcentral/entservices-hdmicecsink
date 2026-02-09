@@ -122,6 +122,7 @@ touch rdk/ds/host.hpp
 touch rdk/ds/manager.hpp
 touch rdk/ds/videoOutputPort.hpp
 touch rdk/iarmbus/libIARM.h
+touch rdk/iarmbus/libIBus.h
 touch rfcapi.h
 echo "files created successfully"
 echo "======================================================================================"

@@ -88,11 +88,11 @@ jobs:
           path: ThunderTools
           ref: R4.4.3
 
-      - name: Checkout entservices-deviceanddisplay
+      - name: Checkout entservices-powermanager
         uses: actions/checkout@v3
         with:
-          repository: rdkcentral/entservices-deviceanddisplay
-          path: entservices-deviceanddisplay
+          repository: rdkcentral/entservices-powermanager
+          path: entservices-powermanager
           ref: develop
 
       - name: Checkout entservices-hdmicecsink
@@ -363,11 +363,11 @@ jobs:
           &&
           cmake --install build/mocks
 
-      - name: Build entservices-deviceanddisplay
+      - name: Build entservices-powermanager
         run: >
           cmake
-          -S "$GITHUB_WORKSPACE/entservices-deviceanddisplay"
-          -B build/entservices-deviceanddisplay
+          -S "$GITHUB_WORKSPACE/entservices-powermanager"
+          -B build/entservices-powermanager
           -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install/usr"
           -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake"
@@ -427,21 +427,16 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
-          -DPLUGIN_SYSTEMSERVICES=OFF
           -DPLUGIN_POWERMANAGER=ON
-          -DPLUGIN_DISPLAYSETTINGS=OFF
-          -DPLUGIN_USERPREFERENCES=OFF
-          -DPLUGIN_DEVICEDIAGNOSTICS=OFF
-          -DPLUGIN_WAREHOUSE=OFF
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON
           -DDS_FOUND=ON
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
           &&
-          cmake --build build/entservices-deviceanddisplay -j8
+          cmake --build build/entservices-powermanager -j8
           &&
-          cmake --install build/entservices-deviceanddisplay
+          cmake --install build/entservices-powermanager
 
       - name: Build entservices-hdmicecsink
         run: >
@@ -551,7 +546,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
-          -I $GITHUB_WORKSPACE/entservices-deviceanddisplay/helpers
+          -I $GITHUB_WORKSPACE/entservices-powermanager/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
           -I $GITHUB_WORKSPACE/install/usr/include/WPEFramework
           -I ./usr/include/libdrm
@@ -739,7 +734,7 @@ jobs:
           -r coverage.info
           '/usr/include/*'
           '*/build/entservices-hdmicecsink/_deps/*'
-          '*/build/entservices-deviceanddisplay/_deps/*'
+          '*/build/entservices-powermanager/_deps/*'
           '*/build/entservices-entservices-testframework/_deps/*'
           '*/build/mocks/*'
           '*/install/usr/include/*'

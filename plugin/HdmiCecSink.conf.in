@@ -1,0 +1,11 @@
+precondition = ["Platform"]
+callsign = "org.rdk.HdmiCecSink"
+autostart = "false"
+startuporder = "@PLUGIN_HDMICECSINK_STARTUPORDER@"
+
+configuration = JSON()
+rootobject = JSON()
+
+rootobject.add("mode", "@PLUGIN_HDMICECSINK_MODE@")
+rootobject.add("locator", "lib@PLUGIN_IMPLEMENTATION@.so")
+configuration.add("root", rootobject)

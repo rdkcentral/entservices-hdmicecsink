@@ -123,7 +123,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: topic/RDKEMW-13621
+          ref: develop
           token: ${{ secrets.RDKCM_RDKE }}
 
       - name: Checkout entservices-hdmicecsink
@@ -138,7 +138,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-hdmicecsink
           path: entservices-hdmicecsink
-          ref: topic/RDKEMW-13684
+          ref: develop
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'

@@ -131,7 +131,7 @@ namespace WPEFramework
                 for (unsigned int i = 0; i < len; i++) {
                    snprintf(strBuffer + (i*3) , sizeof(strBuffer) - (i*3), "%02X ",(uint8_t) *(buf + i));
                 }
-                snprintf(strBuffer, sizeof(strBuffer), "Test format %s", someValue);
+                snprintf(strBuffer, sizeof(strBuffer), "Test format %s");
 
                 LOGINFO("   >>>>>    Received CEC Frame: :%s \n",strBuffer);
 

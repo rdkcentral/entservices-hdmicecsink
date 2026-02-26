@@ -13,6 +13,7 @@ on:
 
 env:
   BUILD_TYPE: Debug
+  REPO_NAME: "hdmicecsink"
   THUNDER_REF: "R4.4.1"
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
@@ -45,25 +46,25 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            thunder/build/Thunder
-            thunder/build/entservices-apis
-            thunder/build/ThunderTools
-            thunder/install
-            !thunder/install/etc/WPEFramework/plugins
-            !thunder/install/usr/bin/RdkServicesTest
-            !thunder/install/usr/include/gmock
-            !thunder/install/usr/include/gtest
-            !thunder/install/usr/lib/libgmockd.a
-            !thunder/install/usr/lib/libgmock_maind.a
-            !thunder/install/usr/lib/libgtestd.a
-            !thunder/install/usr/lib/libgtest_maind.a
-            !thunder/install/usr/lib/cmake/GTest
-            !thunder/install/usr/lib/pkgconfig/gmock.pc
-            !thunder/install/usr/lib/pkgconfig/gmock_main.pc
-            !thunder/install/usr/lib/pkgconfig/gtest.pc
-            !thunder/install/usr/lib/pkgconfig/gtest_main.pc
-            !thunder/install/usr/lib/wpeframework/plugins
-          key: ${{ runner.os }}-${{ env.THUNDER_REF }}-${{ env.INTERFACES_REF }}-4
+            build/Thunder
+            build/entservices-apis
+            build/ThunderTools
+            install
+            !install/etc/WPEFramework/plugins
+            !install/usr/bin/RdkServicesTest
+            !install/usr/include/gmock
+            !install/usr/include/gtest
+            !install/usr/lib/libgmockd.a
+            !install/usr/lib/libgmock_maind.a
+            !install/usr/lib/libgtestd.a
+            !install/usr/lib/libgtest_maind.a
+            !install/usr/lib/cmake/GTest
+            !install/usr/lib/pkgconfig/gmock.pc
+            !install/usr/lib/pkgconfig/gmock_main.pc
+            !install/usr/lib/pkgconfig/gtest.pc
+            !install/usr/lib/pkgconfig/gtest_main.pc
+            !install/usr/lib/wpeframework/plugins
+          key: ${{ runner.os }}-${{ env.REPO_NAME }}-${{ env.THUNDER_REF }}-${{ env.INTERFACES_REF }}-4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -103,7 +104,6 @@ jobs:
             sudo ninja -C build install
 
       - name: Checkout Thunder
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           repository: rdkcentral/Thunder
@@ -141,7 +141,6 @@ jobs:
           ref: develop
 
       - name: Checkout googletest
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           repository: google/googletest
@@ -149,6 +148,7 @@ jobs:
           ref: v1.15.0
 
       - name: Apply patches ThunderTools
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |  
           cd $GITHUB_WORKSPACE/ThunderTools
           patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/00010-R4.4-Add-support-for-project-dir.patch
@@ -170,6 +170,7 @@ jobs:
           cmake --install build/ThunderTools
 
       - name: Apply patches Thunder
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cd $GITHUB_WORKSPACE/Thunder
           patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/Use_Legact_Alt_Based_On_ThunderTools_R4.4.3.patch
@@ -198,7 +199,6 @@ jobs:
           cmake --install build/Thunder
 
       - name: Checkout entservices-apis
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           repository: rdkcentral/entservices-apis
@@ -313,7 +313,6 @@ jobs:
         run: echo "TOOLCHAIN_FILE=$GITHUB_WORKSPACE/entservices-testframework/Tests/gcc-with-coverage.cmake" >> $GITHUB_ENV
 
       - name: Build googletest
-        if: steps.cache.outputs.cache-hit != 'true'
         run: >
           cmake -G Ninja
           -S "$GITHUB_WORKSPACE/googletest"
@@ -360,8 +359,6 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests
           -I $GITHUB_WORKSPACE/entservices-hdmicecsink/helpers
-          -I $GITHUB_WORKSPACE/Thunder/Source
-          -I $GITHUB_WORKSPACE/Thunder/Source/core
           -I $GITHUB_WORKSPACE/install/usr/include
           -I ./usr/include/libdrm
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
@@ -419,8 +416,6 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/network
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests
-          -I $GITHUB_WORKSPACE/Thunder/Source
-          -I $GITHUB_WORKSPACE/Thunder/Source/core
           -I $GITHUB_WORKSPACE/install/usr/include
           -I $GITHUB_WORKSPACE/install/usr/include/WPEFramework
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
@@ -640,7 +635,7 @@ jobs:
           rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Run unit tests with valgrind
-        if: ${{ !env.ACT }}
+        if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}
         run: >
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
@@ -657,7 +652,7 @@ jobs:
           rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Generate coverage
-        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT }}
+        if: ${{ matrix.coverage == 'with-coverage' && !env.ACT && inputs.caller_source != 'testframework' }}
         run: >
           cp $GITHUB_WORKSPACE/entservices-testframework/Tests/L1Tests/.lcovrc_l1 ~/.lcovrc
           &&
@@ -693,3 +688,4 @@ jobs:
             rdkL1TestResultsWithValgrind.json
           if-no-files-found: warn
           
+

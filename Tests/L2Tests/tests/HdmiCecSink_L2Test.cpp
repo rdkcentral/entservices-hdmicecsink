@@ -277,6 +277,8 @@ public:
             }
         }
         signalled = m_event_signalled;
+        // Clear only the expected flags that were waited for, not all flags
+        m_event_signalled &= ~expected_status;
         return signalled;
     }
 };
@@ -311,6 +313,7 @@ class HdmiCecSink_L2Test : public L2TestMocks {
 protected:
     HdmiCecSink_L2Test();
     virtual ~HdmiCecSink_L2Test() override;
+    virtual void SetUp() override;
 
 public:
     uint32_t CreateHdmiCecSinkInterfaceObject();
@@ -496,6 +499,13 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     EXPECT_EQ(Core::ERROR_NONE, status);
 }
 
+void HdmiCecSink_L2Test::SetUp()
+{
+    // Reset all event flags before each test to prevent race conditions from stale flags
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_event_signalled = HDMICECSINK_STATUS_INVALID;
+}
+
 HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
 {
     uint32_t status = Core::ERROR_GENERAL;
@@ -526,6 +536,7 @@ HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
 class HdmiCecSink_L2Test_STANDBY : public L2TestMocks {
 protected:
     HdmiCecSink_L2Test_STANDBY();
+    virtual void SetUp() override;
     virtual ~HdmiCecSink_L2Test_STANDBY() override;
 
 public:
@@ -706,6 +717,13 @@ HdmiCecSink_L2Test_STANDBY::~HdmiCecSink_L2Test_STANDBY()
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     removeFile("/opt/uimgr_settings.bin");
+}
+
+void HdmiCecSink_L2Test_STANDBY::SetUp()
+{
+    // Reset all event flags before each test to prevent race conditions from stale flags
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_event_signalled = HDMICECSINK_STATUS_INVALID;
 }
 
 void HdmiCecSink_L2Test::arcInitiationEvent(const JsonObject& message)

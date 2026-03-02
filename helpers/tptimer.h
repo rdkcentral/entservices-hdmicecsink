@@ -107,7 +107,7 @@ namespace Plugin {
 
         void connect(std::function<void()> callback)
         {
-            onTimeoutCallback = callback;
+            onTimeoutCallback = std::move(callback);
         }
 
     private:

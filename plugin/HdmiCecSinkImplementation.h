@@ -156,6 +156,7 @@ namespace WPEFramework {
                 m_isPowerStatusUpdated = false;
                 m_isDeviceDisconnected = false;
                 m_isDeviceTypeUpdated = false;
+                m_isRequested = 0;
                 m_isRequestRetry = 0;
             }
 

@@ -3189,7 +3189,7 @@ namespace WPEFramework
              {
                  std::lock_guard<std::mutex> lock(m_arcRoutingStateMutex);
                  LOGINFO("Current ARC State : %d\n", m_currentArcRoutingState);
-             }  
+             }
 
         _instance->requestArcInitiation();
 
@@ -3232,7 +3232,7 @@ namespace WPEFramework
                     LOGINFO("ARC is either Termination  in progress or already Terminated");
                     return;
                 }
-            }		
+            }
 
            _instance->requestArcTermination();
            /* start a timer for 3 sec to get the desired ARC_STATE_ARC_TERMINATED */
@@ -3280,7 +3280,6 @@ namespace WPEFramework
                 std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
                 LOGINFO("Got : INITIATE_ARC  and current Arcstate is %d\n",_instance->m_currentArcRoutingState);
             }
-	    	
             if (m_arcStartStopTimer.isActive())
             {
                m_arcStartStopTimer.stop();
@@ -3311,7 +3310,7 @@ namespace WPEFramework
             {
                 std::lock_guard<std::mutex> lock(HdmiCecSinkImplementation::_instance->m_arcRoutingStateMutex);
                 LOGINFO("Command: TERMINATE_ARC current arc state %d \n",HdmiCecSinkImplementation::_instance->m_currentArcRoutingState);
-            }	    
+            }
             if (m_arcStartStopTimer.isActive())
             {
                   m_arcStartStopTimer.stop();

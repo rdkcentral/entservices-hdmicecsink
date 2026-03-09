@@ -37,6 +37,8 @@
 #include "hdmiIn.hpp"
 #include "dsError.h"
 
+#include <telemetry_busmessage_sender.h>
+
 using CCECRequestActiveSource = ::RequestActiveSource;
 using CCECSetMenuLanguage = ::SetMenuLanguage;
 using CCECRequestShortAudioDescriptor = ::RequestShortAudioDescriptor;
@@ -287,6 +289,11 @@ namespace WPEFramework
        {
          bool updateStatus ;
              LOGINFO("Command: SetOSDName OSDName : %s\n",msg.osdName.toString().c_str());
+
+		   	 std::string OSDName_string = msg.osdName.toString()
+		   	 std::string value = "Command: SetOSDName OSDName : " + OSDName_string;
+             t2_event_s("HDMI_DeviceInfo_split", (char*)value.c_str());
+		   
          if(header.to.toInt() == LogicalAddress::BROADCAST){
         LOGINFO("Ignore Broadcast messages, accepts only direct messages");
         return;

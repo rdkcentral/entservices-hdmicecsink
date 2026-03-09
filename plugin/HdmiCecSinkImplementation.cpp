@@ -1961,6 +1961,16 @@ namespace WPEFramework
                 hdmiInputs[i].update(device::HdmiInput::getInstance().isPortConnected(i));
 
                 LOGINFO("Is HDMI In Port [%d] connected [%d] \n",i, hdmiInputs[i].m_isConnected);
+				if (i == 0 && hdmiInputs[i].m_isConnected == 1) {
+             		t2_event_d("HDMI_INFO_PORT1connected", 1);
+				}
+				else if (i == 1 && hdmiInputs[i].m_isConnected == 1) {
+             		t2_event_d("HDMI_INFO_PORT2connected", 1);
+				}
+				else if (i == 2 && hdmiInputs[i].m_isConnected == 1) {
+             		t2_event_d("HDMI_INFO_PORT3connected", 1);
+				}
+				
                 if ( hdmiInputs[i].m_isConnected )
                 {
                     isAnyPortConnected = true;

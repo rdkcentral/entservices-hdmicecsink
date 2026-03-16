@@ -417,6 +417,7 @@ jobs:
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvSettingsODM.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/tvTypes.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/essos-resmgr.h
+          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Telemetry.h
           -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog -Wl,-wrap,v_secure_system -Wl,-wrap,v_secure_popen -Wl,-wrap,v_secure_pclose -Wl,-wrap,unlink
           -DUSE_IARMBUS
@@ -425,6 +426,7 @@ jobs:
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
+          -DENABLE_TELEMETRY_LOGGING
           -DENABLE_THERMAL_PROTECTION"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
@@ -434,6 +436,7 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Telemetry=ON
           -DPLUGIN_POWERMANAGER=ON
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON

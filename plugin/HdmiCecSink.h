@@ -215,6 +215,20 @@ namespace WPEFramework {
                                     Exchange::JHdmiCecSink::Event::ReportAudioDevicePowerStatus(_parent, powerStatus);
                                 }
 
+                                void OnKeyReleaseEvent(const int logicalAddress) override
+                                {
+                                    LOGINFO("OnKeyReleaseEvent");
+                                    LOGINFO("logicalAddress: %d", logicalAddress);
+                                    Exchange::JHdmiCecSink::Event::OnKeyReleaseEvent(_parent, logicalAddress);
+                                }
+                                
+                                void OnKeyPressEvent(const int logicalAddress, const int keyCode) override
+                                {
+                                    LOGINFO("OnKeyPressEvent");
+                                    LOGINFO("logicalAddress: %d, keyCode: %d", logicalAddress, keyCode);
+                                    Exchange::JHdmiCecSink::Event::OnKeyPressEvent(_parent, logicalAddress, keyCode);
+                                }
+
                             private:
                                 HdmiCecSink &_parent;
 

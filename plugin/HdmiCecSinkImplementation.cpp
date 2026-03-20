@@ -38,6 +38,8 @@
 #include "hdmiIn.hpp"
 #include "dsError.h"
 
+#include <telemetry_busmessage_sender.h>
+
 using CCECRequestActiveSource = ::RequestActiveSource;
 using CCECSetMenuLanguage = ::SetMenuLanguage;
 using CCECRequestShortAudioDescriptor = ::RequestShortAudioDescriptor;
@@ -288,6 +290,11 @@ namespace WPEFramework
        {
          bool updateStatus ;
              LOGINFO("Command: SetOSDName OSDName : %s\n",msg.osdName.toString().c_str());
+
+		   	 std::string OSDName_string = msg.osdName.toString();
+		   	 std::string value = "Command: SetOSDName OSDName : " + OSDName_string;
+             t2_event_s("HDMI_DeviceInfo_split", (char*)value.c_str());
+		   
          if(header.to.toInt() == LogicalAddress::BROADCAST){
         LOGINFO("Ignore Broadcast messages, accepts only direct messages");
         return;
@@ -1955,6 +1962,16 @@ namespace WPEFramework
                 hdmiInputs[i].update(device::HdmiInput::getInstance().isPortConnected(i));
 
                 LOGINFO("Is HDMI In Port [%d] connected [%d] \n",i, hdmiInputs[i].m_isConnected);
+				if (i == 0 && hdmiInputs[i].m_isConnected == 1) {
+             		t2_event_d("HDMI_INFO_PORT1connected", 1);
+				}
+				else if (i == 1 && hdmiInputs[i].m_isConnected == 1) {
+             		t2_event_d("HDMI_INFO_PORT2connected", 1);
+				}
+				else if (i == 2 && hdmiInputs[i].m_isConnected == 1) {
+             		t2_event_d("HDMI_INFO_PORT3connected", 1);
+				}
+				
                 if ( hdmiInputs[i].m_isConnected )
                 {
                     isAnyPortConnected = true;

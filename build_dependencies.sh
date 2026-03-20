@@ -124,6 +124,7 @@ touch rdk/ds/videoOutputPort.hpp
 touch rdk/iarmbus/libIARM.h
 touch rdk/iarmbus/libIBus.h
 touch rfcapi.h
+touch telemetry_busmessage_sender.h
 echo "files created successfully"
 echo "======================================================================================"
 

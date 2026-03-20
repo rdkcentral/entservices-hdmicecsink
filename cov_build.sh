@@ -36,6 +36,7 @@ cmake -G Ninja -S "$GITHUB_WORKSPACE" -B build/entservices-hdmicecsink \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/devicesettings.h \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/Iarm.h \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/Rfc.h \
+-include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/Telemetry.h \
 -include ${GITHUB_WORKSPACE}/entservices-testframework/Tests/mocks/HdmiCec.h \
 -Wall -Wno-unused-result -Werror -Wno-error=format \
 -Wl,-wrap,system -Wl,-wrap,popen -Wl,-wrap,syslog \

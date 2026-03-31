@@ -462,12 +462,14 @@ namespace WPEFramework
                         OpCode featureOpcode =  msg.feature;
             AbortReason abortReason = msg.reason;
 
+                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
                          if(msg.feature.opCode() == REQUEST_SHORT_AUDIO_DESCRIPTOR)
                  {
                             JsonArray audiodescriptor;
                             audiodescriptor.Add(0);
+                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
                 HdmiCecSinkImplementation::_instance->Send_ShortAudioDescriptor_Event(audiodescriptor);
                         }
 
@@ -480,6 +482,7 @@ namespace WPEFramework
                 AbortReason reason = AbortReason::UNRECOGNIZED_OPCODE;
                 LogicalAddress logicaladdress =header.from.toInt();
                 OpCode feature = msg.opCode();
+                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
                 HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else
@@ -748,6 +751,7 @@ namespace WPEFramework
            m_sendKeyEventThreadExit = false;
            m_sendKeyEventThread = std::thread(threadSendKeyEvent);
 
+           /* coverity[MISSING_LOCK : FALSE] */
            m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
            m_semSignaltoArcRoutingThread.acquire();
            m_arcRoutingThread = std::thread(threadArcRouting);
@@ -931,6 +935,7 @@ namespace WPEFramework
             else
             {
                     powerState = DEVICE_POWER_STATE_OFF;
+                    /* coverity[MISSING_LOCK : FALSE] */
                     if((_instance->m_currentArcRoutingState == ARC_STATE_REQUEST_ARC_INITIATION) || (_instance->m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
                     {
                         LOGINFO("%s: Stop ARC \n",__FUNCTION__);
@@ -1118,6 +1123,7 @@ namespace WPEFramework
                  return;
             }
 
+        /* coverity[MISSING_LOCK : FALSE] */
         if ( (msg.status.toInt() == SYSTEM_AUDIO_MODE_OFF) && (m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
             {
                 /* ie system audio mode off -> amplifier goign to standby but still ARC is in initiated state,stop ARC and 
@@ -3118,6 +3124,7 @@ namespace WPEFramework
             }
 
             m_logicalAddressAllocated = LogicalAddress::UNREGISTERED;
+            /* coverity[MISSING_LOCK : FALSE] */
             m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
             if (m_audioStatusDetectionTimer.isActive()){
                     m_audioStatusDetectionTimer.stop();

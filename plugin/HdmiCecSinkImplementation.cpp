@@ -463,6 +463,7 @@ namespace WPEFramework
             AbortReason abortReason = msg.reason;
 
                         /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
+                        /* Using std::move on variables passed to reportFeatureAbortEvent is ineffective since reportFeatureAbortEvent takes const reference parameters */
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
                          if(msg.feature.opCode() == REQUEST_SHORT_AUDIO_DESCRIPTOR)
@@ -470,6 +471,7 @@ namespace WPEFramework
                             JsonArray audiodescriptor;
                             audiodescriptor.Add(0);
                 /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
+                /* audiodescriptor is a local variable that's only used once at this call site and not referenced afterward */
                 HdmiCecSinkImplementation::_instance->Send_ShortAudioDescriptor_Event(audiodescriptor);
                         }
 
@@ -483,7 +485,8 @@ namespace WPEFramework
                 LogicalAddress logicaladdress =header.from.toInt();
                 OpCode feature = msg.opCode();
                 /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
-                HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
+                /* Using std::move on variables passed to sendFeatureAbort is ineffective since sendFeatureAbort takes const reference parameters */
+				HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else
          {

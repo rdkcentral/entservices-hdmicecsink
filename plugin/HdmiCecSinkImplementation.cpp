@@ -755,6 +755,7 @@ namespace WPEFramework
            m_sendKeyEventThread = std::thread(threadSendKeyEvent);
 
            /* coverity[MISSING_LOCK : FALSE] */
+		   /* A lock is not required, as the state is checked and acted upon in the next line, per the plugin owner's review comments. */
            m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
            m_semSignaltoArcRoutingThread.acquire();
            m_arcRoutingThread = std::thread(threadArcRouting);
@@ -939,6 +940,7 @@ namespace WPEFramework
             {
                     powerState = DEVICE_POWER_STATE_OFF;
                     /* coverity[MISSING_LOCK : FALSE] */
+                    /* A lock is not required, as the state is checked and acted upon in the next line, per the plugin owner's review comments. */
                     if((_instance->m_currentArcRoutingState == ARC_STATE_REQUEST_ARC_INITIATION) || (_instance->m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
                     {
                         LOGINFO("%s: Stop ARC \n",__FUNCTION__);
@@ -1127,6 +1129,7 @@ namespace WPEFramework
             }
 
         /* coverity[MISSING_LOCK : FALSE] */
+        /* A lock is not required, as the state is checked and acted upon in the next line, per the plugin owner's review comments. */
         if ( (msg.status.toInt() == SYSTEM_AUDIO_MODE_OFF) && (m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
             {
                 /* ie system audio mode off -> amplifier goign to standby but still ARC is in initiated state,stop ARC and 
@@ -3128,6 +3131,7 @@ namespace WPEFramework
 
             m_logicalAddressAllocated = LogicalAddress::UNREGISTERED;
             /* coverity[MISSING_LOCK : FALSE] */
+            /* A lock is not required, as the state is checked and acted upon in the next line, per the plugin owner's review comments. */
             m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
             if (m_audioStatusDetectionTimer.isActive()){
                     m_audioStatusDetectionTimer.stop();

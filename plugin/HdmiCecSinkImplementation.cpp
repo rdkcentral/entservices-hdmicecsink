@@ -470,9 +470,7 @@ namespace WPEFramework
                  {
                             JsonArray audiodescriptor;
                             audiodescriptor.Add(0);
-                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
-                /* audiodescriptor is a local variable that's only used once at this call site and not referenced afterward */
-                HdmiCecSinkImplementation::_instance->Send_ShortAudioDescriptor_Event(audiodescriptor);
+                HdmiCecSinkImplementation::_instance->Send_ShortAudioDescriptor_Event(std::move(audiodescriptor));
                         }
 
        }

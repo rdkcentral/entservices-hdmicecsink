@@ -484,7 +484,7 @@ namespace WPEFramework
                 OpCode feature = msg.opCode();
                 /* Using std::move on variables passed to sendFeatureAbort is ineffective since sendFeatureAbort takes const reference parameters */
                 /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
-				HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
+                HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else
          {

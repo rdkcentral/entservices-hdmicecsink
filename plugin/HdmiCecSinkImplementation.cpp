@@ -462,8 +462,8 @@ namespace WPEFramework
                         OpCode featureOpcode =  msg.feature;
             AbortReason abortReason = msg.reason;
 
-                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
                         /* Using std::move on variables passed to reportFeatureAbortEvent is ineffective since reportFeatureAbortEvent takes const reference parameters */
+                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
                          if(msg.feature.opCode() == REQUEST_SHORT_AUDIO_DESCRIPTOR)
@@ -482,8 +482,8 @@ namespace WPEFramework
                 AbortReason reason = AbortReason::UNRECOGNIZED_OPCODE;
                 LogicalAddress logicaladdress =header.from.toInt();
                 OpCode feature = msg.opCode();
-                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
                 /* Using std::move on variables passed to sendFeatureAbort is ineffective since sendFeatureAbort takes const reference parameters */
+                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
 				HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else
@@ -752,8 +752,8 @@ namespace WPEFramework
            m_sendKeyEventThreadExit = false;
            m_sendKeyEventThread = std::thread(threadSendKeyEvent);
 
+		   /* marking as intended*/
            /* coverity[MISSING_LOCK : FALSE] */
-		   /* A lock is not required, as the state is checked and acted upon in the next line. */
            m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
            m_semSignaltoArcRoutingThread.acquire();
            m_arcRoutingThread = std::thread(threadArcRouting);
@@ -937,8 +937,8 @@ namespace WPEFramework
             else
             {
                     powerState = DEVICE_POWER_STATE_OFF;
+                    /* marking as intended*/
                     /* coverity[MISSING_LOCK : FALSE] */
-                    /* A lock is not required, as the state is checked and acted upon in the next line. */
                     if((_instance->m_currentArcRoutingState == ARC_STATE_REQUEST_ARC_INITIATION) || (_instance->m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
                     {
                         LOGINFO("%s: Stop ARC \n",__FUNCTION__);
@@ -1126,8 +1126,8 @@ namespace WPEFramework
                  return;
             }
 
+        /* marking as intended*/
         /* coverity[MISSING_LOCK : FALSE] */
-        /* A lock is not required, as the state is checked and acted upon in the next line. */
         if ( (msg.status.toInt() == SYSTEM_AUDIO_MODE_OFF) && (m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
             {
                 /* ie system audio mode off -> amplifier goign to standby but still ARC is in initiated state,stop ARC and 
@@ -3128,8 +3128,8 @@ namespace WPEFramework
             }
 
             m_logicalAddressAllocated = LogicalAddress::UNREGISTERED;
+            /* marking as intended*/
             /* coverity[MISSING_LOCK : FALSE] */
-            /* A lock is not required, as the state is checked and acted upon in the next line. */
             m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
             if (m_audioStatusDetectionTimer.isActive()){
                     m_audioStatusDetectionTimer.stop();

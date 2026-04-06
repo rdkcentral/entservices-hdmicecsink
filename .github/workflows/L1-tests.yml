@@ -626,6 +626,15 @@ jobs:
           &&
           ls -l /dev/disk/by-id/usb-JetFlash_Transcend_16GB_UEUIRCXT-0
 
+      - name: Run unit tests without valgrind
+        run: >
+          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
+          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
+          GTEST_OUTPUT="json:$(pwd)/rdkL1TestResults.json"
+          gdb -batch --return-child-result -ex "set logging file $GITHUB_WORKSPACE/gdb_log.txt" -ex "set logging on" -ex "run" -ex "bt" -ex "info registers" -ex "quit" --args RdkServicesL1Test 2>&1 | tee $GITHUB_WORKSPACE/gdb_output.log &&
+          cp -rf $(pwd)/rdkL1TestResults.json $GITHUB_WORKSPACE/rdkL1TestResultsWithoutValgrind.json &&
+          rm -rf $(pwd)/rdkL1TestResults.json
+
       - name: Capture detailed crash info on failure
         if: failure()
         run: |
@@ -638,15 +647,6 @@ jobs:
           free -h >> $GITHUB_WORKSPACE/debug_info.log
           echo "Disk space:" >> $GITHUB_WORKSPACE/debug_info.log
           df -h >> $GITHUB_WORKSPACE/debug_info.log
-
-      - name: Run unit tests without valgrind
-        run: >
-          PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
-          LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
-          GTEST_OUTPUT="json:$(pwd)/rdkL1TestResults.json"
-          gdb -batch --return-child-result -ex "set logging file $GITHUB_WORKSPACE/gdb_log.txt" -ex "set logging on" -ex "run" -ex "bt" -ex "info registers" -ex "quit" --args RdkServicesL1Test 2>&1 | tee $GITHUB_WORKSPACE/gdb_output.log &&
-          cp -rf $(pwd)/rdkL1TestResults.json $GITHUB_WORKSPACE/rdkL1TestResultsWithoutValgrind.json &&
-          rm -rf $(pwd)/rdkL1TestResults.json
 
       - name: Run unit tests with valgrind
         if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}

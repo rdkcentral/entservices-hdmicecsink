@@ -254,6 +254,7 @@ jobs:
           maintenanceMGR.h
           pkg.h
           edid-parser.hpp
+          telemetry_busmessage_sender.h
           btmgr.h
           tvError.h
           tvTypes.h

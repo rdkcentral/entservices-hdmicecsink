@@ -709,7 +709,7 @@ jobs:
         with:
           name: Build results
           path: |
-            build/entservices-hdmicecsource/
+            build/entservices-hdmicecsink/
             valgrind_log
             gdb_log.txt
             gdb_output.log

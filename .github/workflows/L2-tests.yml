@@ -398,6 +398,7 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/systemservices/proc
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks
           -I $GITHUB_WORKSPACE/install/usr/include
+          -I $GITHUB_WORKSPACE/entservices-powermanager/helpers
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
@@ -426,6 +427,7 @@ jobs:
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DHAS_API_POWERSTATE
+          -DENABLE_TELEMETRY_LOGGING
           -DENABLE_THERMAL_PROTECTION"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
@@ -435,6 +437,7 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_Udev=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
+          -DCMAKE_DISABLE_FIND_PACKAGE_Telemetry=ON
           -DPLUGIN_POWERMANAGER=ON
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON

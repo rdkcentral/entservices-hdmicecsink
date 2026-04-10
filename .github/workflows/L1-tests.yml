@@ -630,9 +630,22 @@ jobs:
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
           GTEST_OUTPUT="json:$(pwd)/rdkL1TestResults.json"
-          RdkServicesL1Test &&
+          gdb -batch --return-child-result -ex "set logging file $GITHUB_WORKSPACE/gdb_log.txt" -ex "set logging on" -ex "run" -ex "bt" -ex "info registers" -ex "quit" --args RdkServicesL1Test 2>&1 | tee $GITHUB_WORKSPACE/gdb_output.log &&
           cp -rf $(pwd)/rdkL1TestResults.json $GITHUB_WORKSPACE/rdkL1TestResultsWithoutValgrind.json &&
           rm -rf $(pwd)/rdkL1TestResults.json
+
+      - name: Capture detailed crash info on failure
+        if: failure()
+        run: |
+          echo "Test failed, capturing additional debugging information..."
+          echo "Core dumps:" >> $GITHUB_WORKSPACE/debug_info.log
+          find . -name "core*" -type f >> $GITHUB_WORKSPACE/debug_info.log 2>/dev/null || echo "No core dumps found" >> $GITHUB_WORKSPACE/debug_info.log
+          echo "System info:" >> $GITHUB_WORKSPACE/debug_info.log
+          uname -a >> $GITHUB_WORKSPACE/debug_info.log
+          echo "Memory info:" >> $GITHUB_WORKSPACE/debug_info.log
+          free -h >> $GITHUB_WORKSPACE/debug_info.log
+          echo "Disk space:" >> $GITHUB_WORKSPACE/debug_info.log
+          df -h >> $GITHUB_WORKSPACE/debug_info.log
 
       - name: Run unit tests with valgrind
         if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}
@@ -688,4 +701,15 @@ jobs:
             rdkL1TestResultsWithValgrind.json
           if-no-files-found: warn
           
-
+      # The below steps are for uploading full build results for debugging purposes.
+      - name: Upload build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build results
+          path: |
+            build/entservices-hdmicecsink/
+            valgrind_log
+            gdb_log.txt
+            gdb_output.log
+            debug_info.log

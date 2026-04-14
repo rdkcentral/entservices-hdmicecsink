@@ -43,6 +43,7 @@
 #include "ManagerMock.h"
 #include "HostMock.h"
 #include "HdmiInputMock.h"
+#include "TelemetryMock.h"
 
 using namespace WPEFramework;
 using ::testing::NiceMock;
@@ -116,6 +117,7 @@ protected:
     LibCCECImplMock         *p_libCCECImplMock = nullptr ;
     RfcApiImplMock   *p_rfcApiImplMock = nullptr ;
     WrapsImplMock  *p_wrapsImplMock   = nullptr ;
+    TelemetryApiImplMock    *p_telemetryApiImplMock = nullptr;
     NiceMock<RfcApiImplMock> rfcApiImplMock;
     NiceMock<WrapsImplMock> wrapsImplMock;
     string response;
@@ -151,6 +153,9 @@ protected:
         p_wrapsImplMock  = new testing::NiceMock <WrapsImplMock>;
         Wraps::setImpl(p_wrapsImplMock); /*Set up mock for fopen;
                                                       to use the mock implementation/the default behavior of the fopen function from Wraps class.*/
+
+        p_telemetryApiImplMock = new NiceMock<TelemetryApiImplMock>;
+        TelemetryApi::setImpl(p_telemetryApiImplMock);
 
         ON_CALL(*p_connectionImplMock, poll(::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
@@ -283,6 +288,13 @@ protected:
         {
             delete p_wrapsImplMock;
             p_wrapsImplMock = nullptr;
+        }
+
+        TelemetryApi::setImpl(nullptr);
+        if (p_telemetryApiImplMock != nullptr)
+        {
+            delete p_telemetryApiImplMock;
+            p_telemetryApiImplMock = nullptr;
         }
     }
 };

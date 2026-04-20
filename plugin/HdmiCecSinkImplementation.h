@@ -99,6 +99,8 @@ namespace WPEFramework {
         void process (const ReportAudioStatus &msg, const Header &header);
         void process (const GiveFeatures &msg, const Header &header);
         void process (const RequestCurrentLatency &msg, const Header &header);
+        void process (const UserControlPressed &msg, const Header &header);
+        void process (const UserControlReleased &msg, const Header &header);
         private:
             Connection conn;
         };
@@ -570,6 +572,8 @@ private:
             int  getUIKeyCode(int keyCode);
         void sendUserControlPressed(const int logicalAddress, int keyCode);
             void sendUserControlReleased(const int logicalAddress);
+            void SendKeyPressMsgEvent(const int logicalAddress,const int keyCode);
+            void SendKeyReleaseMsgEvent(const int logicalAddress);
             void sendGiveAudioStatusMsg();
             void onPowerModeChanged(const PowerState &currentState, const PowerState &newState);
             void registerEventHandlers();

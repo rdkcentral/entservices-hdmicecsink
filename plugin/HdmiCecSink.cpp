@@ -122,7 +122,6 @@ namespace WPEFramework
 
              _hdmiCecSink->Unregister(&_notification);
              Exchange::JHdmiCecSink::Unregister(*this);
-             _hdmiCecSink = nullptr;
              _hdmiCecSink->Release();
              _hdmiCecSink = nullptr;
 

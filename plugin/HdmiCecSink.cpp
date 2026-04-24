@@ -57,7 +57,7 @@ namespace WPEFramework
 
            if (profileType == STB || profileType == NOT_FOUND)
            {
-               LOGINFO("Invalid profile type for TV \n");
+               LOGINFO("Invalid profile type for TV %s \n");
                return (std::string("Not supported"));
            }
 

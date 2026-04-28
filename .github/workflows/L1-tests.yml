@@ -124,8 +124,8 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.1
-
+          ref: feature/RDKEMW-14961-2
+          
       - name: Checkout entservices-hdmicecsink
         if: ${{ inputs.caller_source == 'local' }}
         uses: actions/checkout@v3

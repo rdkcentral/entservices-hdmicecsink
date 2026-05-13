@@ -93,7 +93,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-powermanager
           path: entservices-powermanager
-          ref: feature/RDKEMW-16743
+          ref: develop
 
       - name: Checkout entservices-hdmicecsink
         if: ${{ inputs.caller_source == 'local' }}

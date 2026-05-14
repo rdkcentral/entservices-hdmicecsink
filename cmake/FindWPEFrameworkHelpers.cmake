@@ -15,10 +15,7 @@ find_path(WPEFrameworkHelpers_INCLUDE_DIRS
     NAMES UtilsLogging.h
     PATH_SUFFIXES wpeframework/helpers)
 
-set(WPEFrameworkHelpers_LIBRARIES
-    ${WPEFrameworkHelpers_LIBRARIES}
-    CACHE PATH "Path to WPEFrameworkHelpers library")
-
+set(WPEFrameworkHelpers_LIBRARIES    ${WPEFrameworkHelpers_LIBRARIES}    CACHE PATH "Path to WPEFrameworkHelpers library")
 set(WPEFrameworkHelpers_INCLUDE_DIRS ${WPEFrameworkHelpers_INCLUDE_DIRS} CACHE PATH "Path to WPEFrameworkHelpers includes")
 
 include(FindPackageHandleStandardArgs)

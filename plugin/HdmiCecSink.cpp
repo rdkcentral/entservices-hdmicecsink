@@ -68,25 +68,36 @@ namespace WPEFramework
             ASSERT(nullptr == _hdmiCecSink);
             ASSERT(0 == _connectionId);
 
-            _service = service;
-            _service->AddRef();
-            _service->Register(&_notification);
-            _hdmiCecSink = _service->Root<Exchange::IHdmiCecSink>(_connectionId, 5000, _T("HdmiCecSinkImplementation"));
+           if (nullptr != service)
+           {
+               msg = "IShell object is NULL";
+           }
+           else
+           {
+               _service = service;
+               _service->AddRef();
+               _service->Register(&_notification);
+               _hdmiCecSink = _service->Root<Exchange::IHdmiCecSink>(_connectionId, 5000, _T("HdmiCecSinkImplementation"));
+               
+               if(nullptr != _hdmiCecSink)
+               {
+                   _hdmiCecSink->Configure(service);
+                   _hdmiCecSink->Register(&_notification);
+                   Exchange::JHdmiCecSink::Register(*this, _hdmiCecSink);
+                   LOGINFO("HdmiCecSink plugin is available. Successfully activated HdmiCecSink Plugin");
+               }
+               else
+               {
+                   msg = "Unable to get HdmiCecSinkImplementation object";
+               }
+           }
 
-            if(nullptr != _hdmiCecSink)
-            {
-                _hdmiCecSink->Configure(service);
-                _hdmiCecSink->Register(&_notification);
-                Exchange::JHdmiCecSink::Register(*this, _hdmiCecSink);
-                LOGINFO("HdmiCecSink plugin is available. Successfully activated HdmiCecSink Plugin");
-            }
-            else
-            {
-                msg = "HdmiCecSink plugin is not available";
-                LOGERR("HdmiCecSink plugin is not available. Failed to activate HdmiCecSink Plugin");
-            }
-            // On success return empty, to indicate there is no error text.
-            return msg;
+           if (!msg.empty())
+           {
+               LOGERR("Failed to activate HdmiCecSink Plugin, Error: [%s]",msg.c_str());
+           }
+           // On success return empty, to indicate there is no error text.
+           return msg;
         }
 
         void HdmiCecSink::Deinitialize(PluginHost::IShell* /* service */)

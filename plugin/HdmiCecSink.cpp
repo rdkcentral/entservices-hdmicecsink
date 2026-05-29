@@ -130,9 +130,10 @@ namespace WPEFramework
 
             if (nullptr != _service)
             {
+                RPC::IRemoteConnection* connection = nullptr;
                 try
                 {
-                    RPC::IRemoteConnection* connection = _service->RemoteConnection(_connectionId);
+                    connection = _service->RemoteConnection(_connectionId);
                     if ( nullptr == connection )
                     {
                         LOGERR("Failed to get IRemoteConnection");
@@ -140,7 +141,6 @@ namespace WPEFramework
                     else
                     {
                         connection->Terminate();
-                        connection->Release();
                     }
                 }
                 catch(const std::exception& e)
@@ -148,6 +148,11 @@ namespace WPEFramework
                     std::string errorMessage = "Failed to terminate connection: ";
                     errorMessage += e.what();
                     LOGERR("%s",errorMessage.c_str());
+                }
+
+                if ( nullptr != connection )
+                {
+                    connection->Release();
                 }
 
                 _connectionId = 0;

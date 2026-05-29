@@ -53,103 +53,117 @@ namespace WPEFramework
 
        const std::string HdmiCecSink::Initialize(PluginHost::IShell *service)
        {
-           profileType = searchRdkProfile();
+            profileType = searchRdkProfile();
 
-           if (profileType == STB || profileType == NOT_FOUND)
-           {
+            if (profileType == STB || profileType == NOT_FOUND)
+            {
                LOGINFO("Invalid profile type for TV \n");
                return (std::string("Not supported"));
+            }
+
+            string msg = "";
+
+            ASSERT(nullptr != service);
+            ASSERT(nullptr == _service);
+            ASSERT(nullptr == _hdmiCecSink);
+            ASSERT(0 == _connectionId);
+
+           if (nullptr == service)
+           {
+               msg = "IShell object is NULL";
+           }
+           else
+           {
+               _service = service;
+               _service->AddRef();
+               _service->Register(&_notification);
+               _hdmiCecSink = _service->Root<Exchange::IHdmiCecSink>(_connectionId, 5000, _T("HdmiCecSinkImplementation"));
+               
+               if(nullptr != _hdmiCecSink)
+               {
+                   _hdmiCecSink->Configure(service);
+                   _hdmiCecSink->Register(&_notification);
+                   Exchange::JHdmiCecSink::Register(*this, _hdmiCecSink);
+                   LOGINFO("HdmiCecSink plugin is available. Successfully activated HdmiCecSink Plugin");
+               }
+               else
+               {
+                   msg = "Unable to get HdmiCecSinkImplementation object";
+               }
            }
 
-           string msg = "";
-
-           ASSERT(nullptr != service);
-           ASSERT(nullptr == _service);
-           ASSERT(nullptr == _hdmiCecSink);
-           ASSERT(0 == _connectionId);
-
-
-           _service = service;
-           _service->AddRef();
-           _service->Register(&_notification);
-           _hdmiCecSink = _service->Root<Exchange::IHdmiCecSink>(_connectionId, 5000, _T("HdmiCecSinkImplementation"));
-
-           if(nullptr != _hdmiCecSink)
-            {
-                _hdmiCecSink->Configure(service);
-                _hdmiCecSink->Register(&_notification);
-                Exchange::JHdmiCecSink::Register(*this, _hdmiCecSink);
-                LOGINFO("HdmiCecSink plugin is available. Successfully activated HdmiCecSink Plugin");
-            }
-            else
-            {
-                msg = "HdmiCecSink plugin is not available";
-                LOGINFO("HdmiCecSink plugin is not available. Failed to activate HdmiCecSink Plugin");
-            }
-
-            if (0 != msg.length())
-            {
-                Deinitialize(service);
-            }
-
+           if (!msg.empty())
+           {
+               LOGERR("Failed to activate HdmiCecSink Plugin, Error: [%s]",msg.c_str());
+           }
            // On success return empty, to indicate there is no error text.
            return msg;
         }
 
-
-       void HdmiCecSink::Deinitialize(PluginHost::IShell* /* service */)
-       {
-
-        profileType = searchRdkProfile();
-
-        if (profileType == STB || profileType == NOT_FOUND)
+        void HdmiCecSink::Deinitialize(PluginHost::IShell* /* service */)
         {
-            LOGINFO("Invalid profile type for TV \n");
-            return ;
-        }
+            profileType = searchRdkProfile();
 
-        if(nullptr != _hdmiCecSink)
-        {
-           bool enabled = false;
-           bool ret = false;
-           HdmiCecSink::_hdmiCecSink->GetEnabled(enabled,ret);
-
-            if(ret && enabled)
+            if (profileType == STB || profileType == NOT_FOUND)
             {
-                    Exchange::IHdmiCecSink::HdmiCecSinkSuccess success;
-                    HdmiCecSink::_hdmiCecSink->SetEnabled(false,success);
+                LOGINFO("Invalid profile type for TV \n");
+                return ;
             }
 
-             _hdmiCecSink->Unregister(&_notification);
-             Exchange::JHdmiCecSink::Unregister(*this);
-             _hdmiCecSink->Release();
-             _hdmiCecSink = nullptr;
+            if(nullptr != _hdmiCecSink)
+            {
+                bool enabled = false;
+                bool ret = false;
+                HdmiCecSink::_hdmiCecSink->GetEnabled(enabled,ret);
 
-             RPC::IRemoteConnection* connection = _service->RemoteConnection(_connectionId);
-             if (connection != nullptr)
-             {
-                try{
-                    connection->Terminate();
+                if(ret && enabled)
+                {
+                    Exchange::IHdmiCecSink::HdmiCecSinkSuccess success;
+                    HdmiCecSink::_hdmiCecSink->SetEnabled(false,success);
+                }
+
+                _hdmiCecSink->Unregister(&_notification);
+                Exchange::JHdmiCecSink::Unregister(*this);
+                _hdmiCecSink->Release();
+                _hdmiCecSink = nullptr;
+            }
+
+            if (nullptr != _service)
+            {
+                RPC::IRemoteConnection* connection = nullptr;
+                try
+                {
+                    connection = _service->RemoteConnection(_connectionId);
+                    if ( nullptr == connection )
+                    {
+                        LOGERR("Failed to get IRemoteConnection");
+                    }
+                    else
+                    {
+                        connection->Terminate();
+                    }
                 }
                 catch(const std::exception& e)
                 {
                     std::string errorMessage = "Failed to terminate connection: ";
                     errorMessage += e.what();
-                    LOGWARN("%s",errorMessage.c_str());
+                    LOGERR("%s",errorMessage.c_str());
                 }
 
-                connection->Release();
-             }
-           }
+                if ( nullptr != connection )
+                {
+                    connection->Release();
+                }
 
-           _connectionId = 0;
-           _service->Unregister(&_notification);
-           _service->Release();
-           _service = nullptr;
-           LOGINFO("HdmiCecSink plugin is deactivated. Successfully deactivated HdmiCecSink Plugin");
+                _connectionId = 0;
+                _service->Unregister(&_notification);
+                _service->Release();
+                _service = nullptr;
+            }
+            LOGINFO("HdmiCecSink plugin is deactivated. Successfully deactivated HdmiCecSink Plugin");
         }
 
-       string HdmiCecSink::Information() const
+        string HdmiCecSink::Information() const
         {
             return("This HdmiCecSink PLugin Facilitates the HDMI CEC Sink Control");
         }
@@ -162,6 +176,5 @@ namespace WPEFramework
                 Core::IWorkerPool::Instance().Submit(PluginHost::IShell::Job::Create(_service, PluginHost::IShell::DEACTIVATED, PluginHost::IShell::FAILURE));
             }
         }
-
     } // namespace Plugin
 } // namespace WPEFramework

@@ -54,26 +54,25 @@ namespace WPEFramework
        const std::string HdmiCecSink::Initialize(PluginHost::IShell *service)
        {
             profileType = searchRdkProfile();
-            
+
             if (profileType == STB || profileType == NOT_FOUND)
             {
                LOGINFO("Invalid profile type for TV \n");
                return (std::string("Not supported"));
             }
-            
+
             string msg = "";
-            
+
             ASSERT(nullptr != service);
             ASSERT(nullptr == _service);
             ASSERT(nullptr == _hdmiCecSink);
             ASSERT(0 == _connectionId);
-            
-            
+
             _service = service;
             _service->AddRef();
             _service->Register(&_notification);
             _hdmiCecSink = _service->Root<Exchange::IHdmiCecSink>(_connectionId, 5000, _T("HdmiCecSinkImplementation"));
-            
+
             if(nullptr != _hdmiCecSink)
             {
                 _hdmiCecSink->Configure(service);
@@ -93,31 +92,31 @@ namespace WPEFramework
         void HdmiCecSink::Deinitialize(PluginHost::IShell* /* service */)
         {
             profileType = searchRdkProfile();
-            
+
             if (profileType == STB || profileType == NOT_FOUND)
             {
                 LOGINFO("Invalid profile type for TV \n");
                 return ;
             }
-            
+
             if(nullptr != _hdmiCecSink)
             {
                 bool enabled = false;
                 bool ret = false;
                 HdmiCecSink::_hdmiCecSink->GetEnabled(enabled,ret);
-                
+
                 if(ret && enabled)
                 {
                     Exchange::IHdmiCecSink::HdmiCecSinkSuccess success;
                     HdmiCecSink::_hdmiCecSink->SetEnabled(false,success);
                 }
-                
+
                 _hdmiCecSink->Unregister(&_notification);
                 Exchange::JHdmiCecSink::Unregister(*this);
                 _hdmiCecSink->Release();
                 _hdmiCecSink = nullptr;
             }
-            
+
             if (nullptr != _service)
             {
                 try

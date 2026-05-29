@@ -68,7 +68,7 @@ namespace WPEFramework
             ASSERT(nullptr == _hdmiCecSink);
             ASSERT(0 == _connectionId);
 
-           if (nullptr != service)
+           if (nullptr == service)
            {
                msg = "IShell object is NULL";
            }

@@ -149,10 +149,11 @@ namespace WPEFramework
                     errorMessage += e.what();
                     LOGERR("%s",errorMessage.c_str());
                 }
+
+                _connectionId = 0;
                 _service->Unregister(&_notification);
                 _service->Release();
                 _service = nullptr;
-                _connectionId = 0;
             }
             LOGINFO("HdmiCecSink plugin is deactivated. Successfully deactivated HdmiCecSink Plugin");
         }

@@ -130,7 +130,6 @@ namespace WPEFramework
                     {
                         connection->Terminate();
                         connection->Release();
-                        _connectionId = 0;
                     }
                 }
                 catch(const std::exception& e)
@@ -142,6 +141,7 @@ namespace WPEFramework
                 _service->Unregister(&_notification);
                 _service->Release();
                 _service = nullptr;
+                _connectionId = 0;
             }
             LOGINFO("HdmiCecSink plugin is deactivated. Successfully deactivated HdmiCecSink Plugin");
         }

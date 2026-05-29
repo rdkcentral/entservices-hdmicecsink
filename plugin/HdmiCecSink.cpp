@@ -150,7 +150,7 @@ namespace WPEFramework
         {
             return("This HdmiCecSink PLugin Facilitates the HDMI CEC Sink Control");
         }
-        
+
         void HdmiCecSink::Deactivated(RPC::IRemoteConnection* connection)
         {
             if (connection->Id() == _connectionId)

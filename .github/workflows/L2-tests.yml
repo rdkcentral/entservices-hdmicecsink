@@ -326,7 +326,7 @@ jobs:
           -DTHUNDER_VERSION=4
           -DTHUNDER_VERSION_MAJOR=4
           -DTHUNDER_VERSION_MINOR=4
-          -DRDK_SERVICES_L1_TEST
+          -DRDK_SERVICES_L2_TEST=ON
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/audiocapturemgr
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds

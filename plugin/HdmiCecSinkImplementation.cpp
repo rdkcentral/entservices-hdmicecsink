@@ -52,7 +52,7 @@ using CCECRequestShortAudioDescriptor = ::RequestShortAudioDescriptor;
 #define HDMICECSINK_NUMBER_TV_ADDR                     2
 #define HDMICECSINK_UPDATE_POWER_STATUS_INTERVA_MS    (60 * 1000)
 #define HDMISINK_ARC_START_STOP_MAX_WAIT_MS           4000
-#define HDMICECSINK_UPDATE_AUDIO_STATUS_INTERVAL_MS    500
+#define HDMICECSINK_UPDATE_AUDIO_STATUS_INTERVAL_MS    2000
 
 
 #define SAD_FMT_CODE_AC3 2
@@ -720,6 +720,7 @@ namespace WPEFramework
            m_isHdmiInConnected = false;
            hdmiCecAudioDeviceConnected = false;
            m_isAudioStatusInfoUpdated = false;
+	   m_audioStatusRequestedCount = 0;
            m_audioStatusReceived = false;
            m_audioStatusTimerStarted = false;
            m_audioDevicePowerStatusRequested = false;
@@ -1171,11 +1172,14 @@ namespace WPEFramework
                 m_audioStatusTimerStarted = false;
                 if (m_audioStatusDetectionTimer.isActive())
                 {
-                    LOGINFO("AudioStatus received from the Audio Device and the timer is still active. So stopping the timer!\n");
-                    m_audioStatusDetectionTimer.stop();
+			LOGINFO("AudioStatus received from the Audio Device and the timer is still active. So stopping the timer!\n");
+			m_audioStatusDetectionTimer.stop();
                 }
-                LOGINFO("AudioStatus received from the Audio Device. Updating the AudioStatus info! m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", m_isAudioStatusInfoUpdated,m_audioStatusReceived,m_audioStatusTimerStarted);
-            }
+		LOGINFO("AudioStatus received from the Audio Device. Updating the AudioStatus info! m_isAudioStatusInfoUpdated :%d, m_audioStatusRequestedCount :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", m_isAudioStatusInfoUpdated,m_audioStatusRequestedCount,m_audioStatusReceived,m_audioStatusTimerStarted);
+	    }
+	    if(m_audioStatusRequestedCount > 0)
+		    m_audioStatusRequestedCount--;
+
             LOGINFO("Command: ReportAudioStatus  %s audio Mute status %d  means %s  and current Volume level is %d \n",GetOpName(msg.opCode()),msg.status.getAudioMuteStatus(),msg.status.toString().c_str(),msg.status.getAudioVolume());
             std::list<Exchange::IHdmiCecSink::INotification*>::const_iterator index(_hdmiCecSinkNotifications.begin());
             while (index != _hdmiCecSinkNotifications.end()) {
@@ -1260,7 +1264,15 @@ namespace WPEFramework
             {
                 return;
             }
+	    if (m_audioStatusDetectionTimer.isActive())
+	    {
+		    LOGINFO("Stopping the Audio Status Timer!\n");
+		    m_audioStatusDetectionTimer.stop();
+		    m_audioStatusTimerStarted = false;
+		    LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ",m_isAudioStatusInfoUpdated,m_audioStatusReceived,m_audioStatusTimerStarted);
+	    }
             LOGINFO(" Send GiveAudioStatus ");
+	    m_audioStatusRequestedCount++;
             _instance->smConnection->sendTo(LogicalAddress::AUDIO_SYSTEM,MessageEncoder().encode(GiveAudioStatus()), 100);
 
         }
@@ -2491,10 +2503,11 @@ namespace WPEFramework
                         m_audioStatusDetectionTimer.stop();
                     }
                     m_isAudioStatusInfoUpdated = false;
+		    m_audioStatusRequestedCount = 0;
                     m_audioStatusReceived = false;
                     m_audioStatusTimerStarted = false;
-                    LOGINFO("Audio device removed, reset the audio status info.  m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", m_isAudioStatusInfoUpdated,m_audioStatusReceived,m_audioStatusTimerStarted);
-                    std::list<Exchange::IHdmiCecSink::INotification*>::const_iterator index(_hdmiCecSinkNotifications.begin());
+                    LOGINFO("Audio device removed, reset the audio status info.  m_isAudioStatusInfoUpdated :%d, m_audioStatusRequestedCount :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d", m_isAudioStatusInfoUpdated,m_audioStatusRequestedCount,m_audioStatusReceived,m_audioStatusTimerStarted);
+		    std::list<Exchange::IHdmiCecSink::INotification*>::const_iterator index(_hdmiCecSinkNotifications.begin());
                     while (index != _hdmiCecSinkNotifications.end()) {
                         (*index)->ReportAudioDeviceConnectedStatus("success", "false");
                         index++;
@@ -3135,10 +3148,10 @@ namespace WPEFramework
                     m_audioStatusDetectionTimer.stop();
             }
             m_isAudioStatusInfoUpdated = false;
+	    m_audioStatusRequestedCount = 0;
             m_audioStatusReceived = false;
             m_audioStatusTimerStarted = false;
-            LOGINFO("CEC Disabled, reset the audio status info. m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", m_isAudioStatusInfoUpdated,m_audioStatusReceived,m_audioStatusTimerStarted);
-
+	    LOGINFO("CEC Disabled, reset the audio status info. m_isAudioStatusInfoUpdated :%d, m_audioStatusRequestedCount :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", m_isAudioStatusInfoUpdated,m_audioStatusRequestedCount,m_audioStatusReceived,m_audioStatusTimerStarted);
             for(int i=0; i< 16; i++)
             {
                 if (_instance->deviceList[i].m_isDevicePresent)
@@ -3435,56 +3448,67 @@ namespace WPEFramework
 
                 uikey = _instance->getUIKeyCode(keyInfo.keyCode);
 
-                if (uikey != KEY_UNSUPPORTED)
+		if((keyInfo.logicalAddr != 0x5) || ((keyInfo.logicalAddr == 0x5) && (_instance->hdmiCecAudioDeviceConnected == true)))
                 {
-                    if(keyInfo.UserControl == "sendUserControlPressed" )
-                    {
-                        LOGINFO("sendUserControlPressed : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
-                        _instance->sendUserControlPressed(keyInfo.logicalAddr,uikey);                        
-                    }
-                    else if(keyInfo.UserControl == "sendUserControlReleased")
-                    {
-                        LOGINFO("sendUserControlReleased : logical addr:0x%x  queue size :%zu \n",keyInfo.logicalAddr,_instance->m_SendKeyQueue.size());
-                        _instance->sendUserControlReleased(keyInfo.logicalAddr);
-                    }
-                    else
-                    {
-                        LOGINFO("sendKeyPressEvent : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
-                        _instance->sendKeyPressEvent(keyInfo.logicalAddr,uikey);
-                        _instance->sendKeyReleaseEvent(keyInfo.logicalAddr);
-                    }
-                }
-                else
-                {
-                    LOGINFO("Unsupported Key code : 0x%x", keyInfo.keyCode);
-                }
+			if (uikey != KEY_UNSUPPORTED)
+			{
+				if(keyInfo.UserControl == "sendUserControlPressed" )
+				{
+					LOGINFO("sendUserControlPressed : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
+					_instance->sendUserControlPressed(keyInfo.logicalAddr,uikey);
+				}
+				else if(keyInfo.UserControl == "sendUserControlReleased")
+				{
+					LOGINFO("sendUserControlReleased : logical addr:0x%x  queue size :%zu \n",keyInfo.logicalAddr,_instance->m_SendKeyQueue.size());
+					_instance->sendUserControlReleased(keyInfo.logicalAddr);
+				}
+				else
+				{
+					LOGINFO("sendKeyPressEvent : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
+					_instance->sendKeyPressEvent(keyInfo.logicalAddr,uikey);
+					_instance->sendKeyReleaseEvent(keyInfo.logicalAddr);
+				}
+			}
+			else
+			{
+				LOGINFO("Unsupported Key code : 0x%x", keyInfo.keyCode);
+			}
 
                 if((_instance->m_SendKeyQueue.size()<=1 || (_instance->m_SendKeyQueue.size() % 2 == 0)) && ((keyInfo.keyCode == VOLUME_UP) || (keyInfo.keyCode == VOLUME_DOWN) || (keyInfo.keyCode == MUTE)) )
                     {
-                        if(keyInfo.keyCode == MUTE)
+			    LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusRequestedCount :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ",_instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusRequestedCount,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
+
+                    if(keyInfo.keyCode == MUTE)
                     {
                         _instance->sendGiveAudioStatusMsg();
                     }
                     else
                     {
-                        LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ",_instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
                         if (!_instance->m_isAudioStatusInfoUpdated)
                         {
-                            if ( !(_instance->m_audioStatusDetectionTimer.isActive()))
-                            {
-                                LOGINFO("Audio status info not updated. Starting the Timer!");
-                                _instance->m_audioStatusTimerStarted = true;
-                                _instance->m_audioStatusDetectionTimer.start((HDMICECSINK_UPDATE_AUDIO_STATUS_INTERVAL_MS));
-                            }
-                            LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", _instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
-                        }
-                        else
+				if (!(_instance->m_audioStatusDetectionTimer.isActive()))
+				{
+					if(_instance->m_audioStatusRequestedCount == 0)
+					{
+						LOGINFO("Audio status info not updated. Starting the Timer!");
+						_instance->m_audioStatusTimerStarted = true;
+						_instance->m_audioStatusDetectionTimer.start((HDMICECSINK_UPDATE_AUDIO_STATUS_INTERVAL_MS));
+					}
+					else
+					{
+						_instance->sendGiveAudioStatusMsg();
+					}
+					LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusRequestedCount :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", _instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusRequestedCount,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
+				}
+			}
+			else
                         {
                             if (!_instance->m_audioStatusReceived){
                                 _instance->sendGiveAudioStatusMsg();
                             }
                         }
                     }
+		    }
                 }
             }//while(!_instance->m_sendKeyEventThreadExit)
         }//threadSendKeyEvent

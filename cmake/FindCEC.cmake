@@ -25,14 +25,21 @@
 
 find_package(PkgConfig)
 
-find_library(CEC_LIBRARIES NAMES RCEC)
+find_library(CEC_CORE_LIBRARIES NAMES RCEC)
+find_library(CEC_RDKVHAL_LIBRARIES NAMES rdkvHAL)
 find_library(CEC_HAL_LIBRARIES NAMES RCECHal)
 find_library(OSAL_LIBRARIES NAMES RCECOSHal)
 
 find_path(CEC_INCLUDE_DIRS NAMES ccec/Connection.hpp PATH_SUFFIXES ccec/include)
 find_path(OSAL_INCLUDE_DIRS NAMES osal/Mutex.hpp PATH_SUFFIXES osal/include)
 
-set(CEC_LIBRARIES "-Wl,--no-as-needed" ${CEC_LIBRARIES} ${CEC_HAL_LIBRARIES} ${OSAL_LIBRARIES} "-Wl,--as-needed")
+set(CEC_LIBRARIES
+    "-Wl,--no-as-needed"
+    ${CEC_CORE_LIBRARIES}
+    ${CEC_RDKVHAL_LIBRARIES}
+    ${CEC_HAL_LIBRARIES}
+    ${OSAL_LIBRARIES}
+    "-Wl,--as-needed")
 
 set(CEC_LIBRARIES ${CEC_LIBRARIES} CACHE PATH "Path to CEC library")
 
@@ -46,5 +53,9 @@ mark_as_advanced(
     CEC_FOUND
     CEC_INCLUDE_DIRS
     CEC_LIBRARIES
+    CEC_CORE_LIBRARIES
+    CEC_RDKVHAL_LIBRARIES
+    CEC_HAL_LIBRARIES
+    OSAL_LIBRARIES
     CEC_LIBRARY_DIRS
     CEC_FLAGS)

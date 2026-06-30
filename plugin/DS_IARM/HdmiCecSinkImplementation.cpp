@@ -132,14 +132,15 @@ namespace WPEFramework
                 in.getBuffer(&buf, &len);
                 for (unsigned int i = 0; i < len; i++) {
                    snprintf(strBuffer + (i*3) , sizeof(strBuffer) - (i*3), "%02X ",(uint8_t) *(buf + i));
-                // Calculate maximum bytes we can safely format (each byte needs 3 chars: "XX ")
-                size_t maxBytes = (sizeof(strBuffer) - 1) / 3;  // Reserve 1 byte for null terminator
-                size_t safelen = (len > maxBytes) ? maxBytes : len;
-
-                for (unsigned int i = 0; i < safelen; i++) {
-                   size_t remaining = sizeof(strBuffer) - (i*3);
-                   if (remaining < 4) break;  // Need at least 4 bytes for "XX " + null terminator
-                   snprintf(strBuffer + (i*3), remaining, "%02X ", (uint8_t) *(buf + i));
+                    // Calculate maximum bytes we can safely format (each byte needs 3 chars: "XX ")
+                    size_t maxBytes = (sizeof(strBuffer) - 1) / 3;  // Reserve 1 byte for null terminator
+                    size_t safelen = (len > maxBytes) ? maxBytes : len;
+                    
+                    for (unsigned int i = 0; i < safelen; i++) {
+                       size_t remaining = sizeof(strBuffer) - (i*3);
+                       if (remaining < 4) break;  // Need at least 4 bytes for "XX " + null terminator
+                       snprintf(strBuffer + (i*3), remaining, "%02X ", (uint8_t) *(buf + i));
+                    }
                 }
                 // Ensure null termination
                 strBuffer[sizeof(strBuffer) - 1] = '\0';

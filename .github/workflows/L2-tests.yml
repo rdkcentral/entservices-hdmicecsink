@@ -111,7 +111,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.14
+          ref: 1.0.17
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
@@ -461,6 +461,7 @@ jobs:
           -DCMAKE_DISABLE_FIND_PACKAGE_RFC=ON
           -DCMAKE_DISABLE_FIND_PACKAGE_RBus=ON
           -DPLUGIN_POWERMANAGER=ON
+          -DPLUGIN_DISPLAYSETTINGS=ON
           -DUSE_THUNDER_R4=ON
           -DPLUGIN_L2Tests=ON
           -DRDK_SERVICE_L2_TEST=ON

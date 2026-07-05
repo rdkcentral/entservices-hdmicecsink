@@ -25,17 +25,8 @@
 #include "ccec/MessageEncoder.hpp"
 #include "UtilsgetRFCConfig.h"
 
-#include "dsDisplay.h"
-#include "videoOutputPort.hpp"
-#include "manager.hpp"
-#include "websocket/URL.h"
-
-#include "UtilsIarm.h"
 #include "UtilsJsonRpc.h"
 #include "UtilssyncPersistFile.h"
-#include "exception.hpp"
-#include "hdmiIn.hpp"
-#include "dsError.h"
 
 #include <telemetry_busmessage_sender.h>
 

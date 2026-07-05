@@ -23,7 +23,6 @@
 #include "ccec/FrameListener.hpp"
 #include "ccec/Connection.hpp"
 
-#include "libIARM.h"
 #include "ccec/Assert.hpp"
 #include "ccec/Messages.hpp"
 #include "ccec/MessageDecoder.hpp"
@@ -709,6 +708,26 @@ private:
         PowerManagerInterfaceRef _powerManagerPlugin;
         Core::Sink<PowerManagerNotification> _pwrMgrNotification;
         bool _registeredEventHandlers;
+        /** Delegate for IDeviceSettingsHDMIIn::INotification (hotplug events). */
+        class DSHDMIInNotification : public Exchange::IDeviceSettingsHDMIIn::INotification {
+            DSHDMIInNotification(const DSHDMIInNotification&) = delete;
+            DSHDMIInNotification& operator=(const DSHDMIInNotification&) = delete;
+        public:
+            explicit DSHDMIInNotification(HdmiCecSinkImplementation& p) : _parent(p) {}
+            ~DSHDMIInNotification() override = default;
+
+            void OnHDMIInEventHotPlug(const Exchange::IDeviceSettingsHDMIIn::HDMIInPort port,
+                                      const bool isConnected) override
+            {
+                _parent.onHdmiInEventHotPlug(port, isConnected);
+            }
+
+            BEGIN_INTERFACE_MAP(DSHDMIInNotification)
+                INTERFACE_ENTRY(Exchange::IDeviceSettingsHDMIIn::INotification)
+            END_INTERFACE_MAP
+        private:
+            HdmiCecSinkImplementation& _parent;
+        };
         Core::Sink<DSHDMIInNotification> _dsHdmiInNotification; // COM-RPC HDMI-In notification sink
         void allocateLogicalAddress(int deviceType);
         void allocateLAforTV();
@@ -787,28 +806,6 @@ private:
         /* DeviceSettingsClientHelper lifecycle callbacks */
         void OnDeviceSettingsActivated() override;
         void OnDeviceSettingsDeactivated() override;
-
-    private:
-        /** Delegate for IDeviceSettingsHDMIIn::INotification (hotplug events). */
-        class DSHDMIInNotification : public Exchange::IDeviceSettingsHDMIIn::INotification {
-            DSHDMIInNotification(const DSHDMIInNotification&) = delete;
-            DSHDMIInNotification& operator=(const DSHDMIInNotification&) = delete;
-        public:
-            explicit DSHDMIInNotification(HdmiCecSinkImplementation& p) : _parent(p) {}
-            ~DSHDMIInNotification() override = default;
-
-            void OnHDMIInEventHotPlug(const Exchange::IDeviceSettingsHDMIIn::HDMIInPort port,
-                                      const bool isConnected) override
-            {
-                _parent.onHdmiInEventHotPlug(port, isConnected);
-            }
-
-            BEGIN_INTERFACE_MAP(DSHDMIInNotification)
-                INTERFACE_ENTRY(Exchange::IDeviceSettingsHDMIIn::INotification)
-            END_INTERFACE_MAP
-        private:
-            HdmiCecSinkImplementation& _parent;
-        };
 
     private:
         template <typename T>

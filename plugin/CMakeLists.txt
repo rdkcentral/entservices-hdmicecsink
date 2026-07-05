@@ -30,8 +30,30 @@ add_library(${MODULE_NAME} SHARED
         HdmiCecSink.cpp
         Module.cpp)
 
+# ── DeviceSettings plugin COM-RPC integration ─────────────────────────────────
+# Selects DS_COMRPC/ (USE_DEVICESETTING_PLUGIN=ON) or DS_IARM/ (OFF) for the
+# plugin implementation, so no #ifdef USE_DEVICESETTING_PLUGIN in any .cpp/.h.
+# ──────────────────────────────────────────────────────────────────────────────
+option(USE_DEVICESETTING_PLUGIN
+    "Enable COM-RPC integration with entservices-devicesettings for HdmiCecSink (replaces libds/IARM path)"
+    ON)
+
+if (USE_DEVICESETTING_PLUGIN)
+    # ── DS_COMRPC/ path ───────────────────────────────────────────────────────
+    # Uses IDeviceSettingsHDMIIn COM-RPC. Does NOT link libds.so.
+    set(HDMICECSINK_IMPL_SRC DS_COMRPC/HdmiCecSinkImplementation.cpp)
+    set(HDMICECSINK_IMPL_INC ${CMAKE_CURRENT_SOURCE_DIR}/DS_COMRPC)
+    message(STATUS "HdmiCecSink: USE_DEVICESETTING_PLUGIN=ON — DS_COMRPC/ path (no libds)")
+else()
+    # ── DS_IARM/ path ─────────────────────────────────────────────────────────
+    # Uses device:: libds APIs directly via IARM bus.
+    set(HDMICECSINK_IMPL_SRC DS_IARM/HdmiCecSinkImplementation.cpp)
+    set(HDMICECSINK_IMPL_INC ${CMAKE_CURRENT_SOURCE_DIR}/DS_IARM)
+    message(STATUS "HdmiCecSink: USE_DEVICESETTING_PLUGIN=OFF — DS_IARM/ path (libds/IARM)")
+endif()
+
 add_library(${PLUGIN_IMPLEMENTATION} SHARED
-        HdmiCecSinkImplementation.cpp
+        ${HDMICECSINK_IMPL_SRC}
         Module.cpp)
 
 set_target_properties(${MODULE_NAME} PROPERTIES
@@ -54,14 +76,37 @@ target_include_directories(${MODULE_NAME} PRIVATE ${CEC_INCLUDE_DIRS})
 target_include_directories(${MODULE_NAME} PRIVATE ${DS_INCLUDE_DIRS})
 set_source_files_properties(HdmiCecSink.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
 
+target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE
+        ${IARMBUS_INCLUDE_DIRS}
+        ${CEC_INCLUDE_DIRS}
+        ${HDMICECSINK_IMPL_INC})
+set_source_files_properties(${HDMICECSINK_IMPL_SRC} PROPERTIES COMPILE_FLAGS "-fexceptions")
 
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${CEC_INCLUDE_DIRS})
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
-set_source_files_properties(HdmiCecSinkImplementation.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
+if (USE_DEVICESETTING_PLUGIN)
+    find_package(${NAMESPACE}Definitions REQUIRED)
+    target_compile_definitions(${PLUGIN_IMPLEMENTATION} PRIVATE USE_DEVICESETTING_PLUGIN)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PUBLIC
+            ${NAMESPACE}Plugins::${NAMESPACE}Plugins
+            ${IARMBUS_LIBRARIES}
+            ${CEC_LIBRARIES}
+            ${NAMESPACE}Definitions::${NAMESPACE}Definitions
+            ${NAMESPACE}::${NAMESPACE}Helpers)
+else()
+    target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${DS_INCLUDE_DIRS})
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PUBLIC
+            ${NAMESPACE}Plugins::${NAMESPACE}Plugins
+            ${IARMBUS_LIBRARIES}
+            ${CEC_LIBRARIES}
+            ${DS_LIBRARIES}
+            ${NAMESPACE}::${NAMESPACE}Helpers)
+endif()
 
-target_link_libraries(${MODULE_NAME} PUBLIC ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${CEC_LIBRARIES} ${DS_LIBRARIES} ${NAMESPACE}::${NAMESPACE}Helpers)
-target_link_libraries(${PLUGIN_IMPLEMENTATION} PUBLIC ${NAMESPACE}Plugins::${NAMESPACE}Plugins ${IARMBUS_LIBRARIES} ${CEC_LIBRARIES} ${DS_LIBRARIES} ${NAMESPACE}::${NAMESPACE}Helpers)
+target_link_libraries(${MODULE_NAME} PUBLIC
+        ${NAMESPACE}Plugins::${NAMESPACE}Plugins
+        ${IARMBUS_LIBRARIES}
+        ${CEC_LIBRARIES}
+        ${DS_LIBRARIES}
+        ${NAMESPACE}::${NAMESPACE}Helpers)
 
 if (NOT RDK_SERVICES_L1_TEST)
     target_compile_options(${PLUGIN_IMPLEMENTATION} PRIVATE -Wno-error=deprecated)

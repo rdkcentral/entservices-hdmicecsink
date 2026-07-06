@@ -70,6 +70,7 @@ find_package(DS)
 find_package(IARMBus)
 find_package(CEC)
 find_package(Telemetry)
+find_library(RFC_LIBRARIES NAMES rfcapi)
 
 target_include_directories(${MODULE_NAME} PRIVATE ${IARMBUS_INCLUDE_DIRS})
 target_include_directories(${MODULE_NAME} PRIVATE ${CEC_INCLUDE_DIRS})
@@ -99,6 +100,10 @@ else()
             ${CEC_LIBRARIES}
             ${DS_LIBRARIES}
             ${NAMESPACE}::${NAMESPACE}Helpers)
+endif()
+
+if(RFC_LIBRARIES)
+    target_link_libraries(${PLUGIN_IMPLEMENTATION} PRIVATE ${RFC_LIBRARIES})
 endif()
 
 target_link_libraries(${MODULE_NAME} PUBLIC

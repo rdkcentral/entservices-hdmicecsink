@@ -124,7 +124,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.14
+          ref: 1.0.17
 
       - name: Checkout entservices-hdmicecsink
         if: ${{ inputs.caller_source == 'local' }}

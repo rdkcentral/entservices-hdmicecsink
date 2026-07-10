@@ -3662,11 +3662,14 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
     if (hdmiIn) {
         /* Register for HDMI-In hotplug events. */
         hdmiIn->Register(&_dsHdmiInNotification);
-        /* Refresh port connection status on re-activation. */
+        /* Refresh input count and ARC port ID in one acquire/release. */
         int32_t count = 0;
         if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE) {
             m_numofHdmiInput = static_cast<int>(count);
-            LOGINFO("HdmiCecSink OnActivated: m_numofHdmiInput=%d", m_numofHdmiInput);
+            /* ARC port is the last HDMI-In port (same logic as getHdmiArcPortID). */
+            HdmiArcPortID = (count > 0) ? static_cast<int32_t>(count - 1) : -1;
+            LOGINFO("HdmiCecSink OnActivated: m_numofHdmiInput=%d HdmiArcPortID=%d",
+                    m_numofHdmiInput, HdmiArcPortID);
         }
         hdmiIn->Release();
     } else {
@@ -3677,7 +3680,8 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
 void HdmiCecSinkImplementation::OnDeviceSettingsDeactivated()
 {
     LOGINFO("HdmiCecSink (DS_COMRPC): DeviceSettings plugin deactivated");
-    /* Sub-interfaces are gone; notifications re-registered on next activation. */
+    /* Invalidate cached ARC port ID — will be refreshed on next OnDeviceSettingsActivated. */
+    HdmiArcPortID = -1;
 }
 
 }} // namespace WPEFramework::Plugin

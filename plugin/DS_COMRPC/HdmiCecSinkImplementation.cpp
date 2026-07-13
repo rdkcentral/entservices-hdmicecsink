@@ -1672,10 +1672,27 @@ namespace WPEFramework
            bool low_latency_mode;
 
            LOGINFO("SetLatencyInfo videoLatency : %s lowLatencyMode : %s audioOutputCompensated : %s audioOutputDelay : %s \n",videoLatency.c_str(),lowLatencyMode.c_str(),audioOutputCompensated.c_str(),audioOutputDelay.c_str());
-           video_latency = stoi(videoLatency);
-           low_latency_mode = stoi(lowLatencyMode);
-           audio_output_compensated = stoi(audioOutputCompensated);
-           audio_output_delay = stoi(audioOutputDelay);
+
+           if (videoLatency.empty() || lowLatencyMode.empty() || audioOutputCompensated.empty() || audioOutputDelay.empty()) {
+               LOGERR("SetLatencyInfo: one or more required parameters are empty, ignoring request\n");
+               successResult.success = false;
+               return Core::ERROR_BAD_REQUEST;
+           }
+
+           try {
+               video_latency = stoi(videoLatency);
+               low_latency_mode = stoi(lowLatencyMode);
+               audio_output_compensated = stoi(audioOutputCompensated);
+               audio_output_delay = stoi(audioOutputDelay);
+           } catch (const std::invalid_argument &e) {
+               LOGERR("SetLatencyInfo: invalid parameter value - %s\n", e.what());
+               successResult.success = false;
+               return Core::ERROR_BAD_REQUEST;
+           } catch (const std::out_of_range &e) {
+               LOGERR("SetLatencyInfo: parameter value out of range - %s\n", e.what());
+               successResult.success = false;
+               return Core::ERROR_BAD_REQUEST;
+           }
 
            updateCurrentLatency(video_latency, low_latency_mode,audio_output_compensated, audio_output_delay);
            successResult.success = true;

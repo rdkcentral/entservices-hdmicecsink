@@ -754,36 +754,6 @@ namespace WPEFramework
                 }
             }
 
-            /* COM-RPC path: query number of HDMI inputs via IDeviceSettingsHDMIIn. */
-            {
-                auto* hdmiIn = AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
-                if (hdmiIn) {
-                    int32_t count = 0;
-                    if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE) {
-                        m_numofHdmiInput = static_cast<int>(count);
-                        LOGINFO("HdmiCecSink (COM-RPC) m_numofHdmiInput %d", m_numofHdmiInput);
-                    } else {
-                        LOGWARN("HdmiCecSink GetHDMIInNumberOfInputs failed, defaulting to 3");
-                        m_numofHdmiInput = 3;
-                    }
-                    hdmiIn->Release();
-                } else {
-                    LOGWARN("HdmiCecSink IDeviceSettingsHDMIIn unavailable, defaulting to 3");
-                    m_numofHdmiInput = 3;
-                }
-            }
-
-            LOGINFO("initalize inputs \n");
-
-           for (int i = 0; i < m_numofHdmiInput; i++){
-                HdmiPortMap hdmiPort((uint8_t)i);
-                LOGINFO(" Add to vector [%d] \n", i);
-                hdmiInputs.push_back(std::move(hdmiPort));
-            }
-
-            LOGINFO("Check the HDMI State \n");
-
-            CheckHdmiInState();
             if (cecSettingEnabled)
             {
                try
@@ -3515,7 +3485,8 @@ namespace WPEFramework
             }
 
         LOGINFO("Running threadArcRouting");
-        _instance->getHdmiArcPortID();
+        /* HdmiArcPortID is set by OnDeviceSettingsActivated() once DS is ready.
+         * No need to query it here — DS is not yet available at thread start. */
 
             while(1)
             {
@@ -3615,25 +3586,6 @@ namespace WPEFramework
 
        }
 
-      void HdmiCecSinkImplementation::getHdmiArcPortID()
-      {
-         /* COM-RPC path: query number of inputs via IDeviceSettingsHDMIIn
-          * and treat port (count-1) as the ARC port (last HDMI port). */
-         auto* hdmiIn = AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
-         if (hdmiIn) {
-             int32_t count = 0;
-             if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE && count > 0) {
-                 HdmiArcPortID = count - 1;
-                 LOGINFO("HDMI ARC port ID (COM-RPC) HdmiArcPortID[%d]", HdmiArcPortID);
-             } else {
-                 LOGWARN("getHdmiArcPortID: GetHDMIInNumberOfInputs failed or no ports");
-             }
-             hdmiIn->Release();
-         } else {
-             LOGWARN("getHdmiArcPortID: IDeviceSettingsHDMIIn unavailable");
-         }
-      }
-
       void HdmiCecSinkImplementation::getCecVersion()
       {
       RFC_ParamData_t param = {0};
@@ -3673,20 +3625,27 @@ namespace WPEFramework { namespace Plugin {
 
 void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
 {
-    LOGINFO("HdmiCecSink (DS_COMRPC): DeviceSettings plugin activated");
+    LOGINFO("HdmiCecSink (DS_COMRPC): DeviceSettings plugin activated.");
 
     auto* hdmiIn = AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
     if (hdmiIn) {
         /* Register for HDMI-In hotplug events. */
         hdmiIn->Register(&_dsHdmiInNotification);
-        /* Refresh input count and ARC port ID in one acquire/release. */
+        /* Get the real input count now that DS is available. */
         int32_t count = 0;
         if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE) {
             m_numofHdmiInput = static_cast<int>(count);
+            hdmiInputs.clear();
+            for (int i = 0; i < m_numofHdmiInput; i++) {
+                hdmiInputs.emplace_back(static_cast<uint8_t>(i));
+            }
+            CheckHdmiInState();
             /* ARC port is the last HDMI-In port (same logic as getHdmiArcPortID). */
             HdmiArcPortID = (count > 0) ? static_cast<int32_t>(count - 1) : -1;
             LOGINFO("HdmiCecSink OnActivated: m_numofHdmiInput=%d HdmiArcPortID=%d",
                     m_numofHdmiInput, HdmiArcPortID);
+        } else {
+            LOGWARN("HdmiCecSink OnActivated: GetHDMIInNumberOfInputs failed");
         }
         hdmiIn->Release();
     } else {

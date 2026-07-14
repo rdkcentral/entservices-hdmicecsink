@@ -582,7 +582,6 @@ private:
             void onPowerModeChanged(const PowerState &currentState, const PowerState &newState);
             void registerEventHandlers();
 	    	void onPresentationLanguageChanged(const string& language);
-            void getHdmiArcPortID();
             int m_numberOfDevices; /* Number of connected devices othethan own device */
             bool m_audioDevicePowerStatusRequested;
 

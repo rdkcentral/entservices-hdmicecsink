@@ -945,11 +945,16 @@ namespace WPEFramework
        void HdmiCecSinkImplementation::onHdmiHotPlug(int portId , int connectStatus)
        {
             LOGINFO("onHdmiHotPlug Status : %d ", connectStatus);
-                        if(!connectStatus)
-                        {
-                            LOGINFO(" removeDevice port: %d Logical address :%d  \r\n",portId,hdmiInputs[portId].m_logicalAddr.toInt() );
-                            _instance->removeDevice(hdmiInputs[portId].m_logicalAddr.toInt());
-                        }
+
+            if (portId >= 0 && portId < m_numofHdmiInput) {
+                hdmiInputs[portId].update(static_cast<bool>(connectStatus));
+            }
+
+            if(!connectStatus)
+            {
+                LOGINFO(" removeDevice port: %d Logical address :%d  \r\n",portId,hdmiInputs[portId].m_logicalAddr.toInt() );
+                _instance->removeDevice(hdmiInputs[portId].m_logicalAddr.toInt());
+            }
             CheckHdmiInState();
 
           if(cecEnableStatus) {
@@ -3639,6 +3644,26 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
             for (int i = 0; i < m_numofHdmiInput; i++) {
                 hdmiInputs.emplace_back(static_cast<uint8_t>(i));
             }
+
+            {
+                Exchange::IDeviceSettingsHDMIIn::HDMIInStatus hdmiStatus;
+                Exchange::IDeviceSettingsHDMIIn::IHDMIInPortConnectionStatusIterator* portConnStatus = nullptr;
+                if (hdmiIn->GetHDMIInStatus(hdmiStatus, portConnStatus) == Core::ERROR_NONE
+                        && portConnStatus != nullptr) {
+                    int portIdx = 0;
+                    Exchange::IDeviceSettingsHDMIIn::HDMIPortConnectionStatus portStatus;
+                    while (portConnStatus->Next(portStatus) && portIdx < m_numofHdmiInput) {
+                        hdmiInputs[portIdx].update(portStatus.isPortConnected);
+                        LOGINFO("HdmiCecSink OnActivated: port[%d] isConnected=%s",
+                                portIdx, portStatus.isPortConnected ? "true" : "false");
+                        portIdx++;
+                    }
+                    portConnStatus->Release();
+                } else {
+                    LOGWARN("HdmiCecSink OnActivated: GetHDMIInStatus failed — port states default to disconnected");
+                }
+            }
+
             CheckHdmiInState();
             /* ARC port is the last HDMI-In port (same logic as getHdmiArcPortID). */
             HdmiArcPortID = (count > 0) ? static_cast<int32_t>(count - 1) : -1;

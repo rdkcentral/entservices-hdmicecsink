@@ -655,6 +655,7 @@ private:
         HdmiCecSinkImplementation& operator=(const HdmiCecSinkImplementation&) = delete;
         //Begin methods
         void InitializePowerManager(PluginHost::IShell *service);
+        void InitializeAfterDSReady();
         //End methods
         std::string logicalAddressDeviceType;
         bool cecSettingEnabled;
@@ -728,6 +729,8 @@ private:
             HdmiCecSinkImplementation& _parent;
         };
         Core::Sink<DSHDMIInNotification> _dsHdmiInNotification; // COM-RPC HDMI-In notification sink
+        PluginHost::IShell* _service;          /* stored in Configure(), used by InitializeAfterDSReady() */
+        bool _dsReadyInitialized;              /* guard: run InitializeAfterDSReady() only once */
         void allocateLogicalAddress(int deviceType);
         void allocateLAforTV();
         void pingDevices(std::vector<int> &connected , std::vector<int> &disconnected);

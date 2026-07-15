@@ -625,6 +625,8 @@ namespace WPEFramework
         , _pwrMgrNotification(*this)
         , _registeredEventHandlers(false)
         , _dsHdmiInNotification(*this)   // COM-RPC HDMI-In notification delegate
+        , _service(nullptr)
+        , _dsReadyInitialized(false)
         {
             LOGWARN("Initializing HdmiCecSinkImplementation");
         }
@@ -692,10 +694,8 @@ namespace WPEFramework
 
        Core::hresult HdmiCecSinkImplementation::Configure(PluginHost::IShell *service)
        {
-           InitializePowerManager(service);
-
            HdmiCecSinkImplementation::_instance = this;
-           smConnection=NULL;
+           smConnection = NULL;
            cecEnableStatus = false;
            HdmiCecSinkImplementation::_instance->m_numberOfDevices = 0;
            m_logicalAddressAllocated = LogicalAddress::UNREGISTERED;
@@ -709,89 +709,31 @@ namespace WPEFramework
            m_pollNextState = POLL_THREAD_STATE_NONE;
            m_pollThreadState = POLL_THREAD_STATE_NONE;
            m_video_latency = DEFAULT_VIDEO_LATENCY;
-           m_latency_flags = DEFAULT_LATENCY_FLAGS ;
+           m_latency_flags = DEFAULT_LATENCY_FLAGS;
            m_audio_output_delay = DEFAULT_AUDIO_OUTPUT_DELAY;
-
            logicalAddressDeviceType = "None";
            logicalAddress = 0xFF;
+           _dsReadyInitialized = false;
 
-           /* Open COM-RPC link to DeviceSettings plugin.
-            * device::Manager::Initialize() is not needed in COM-RPC path.
-            * HDMI-In notifications arrive via OnDeviceSettingsActivated(). */
+           /* Step 1: Power manager — available immediately. */
+           InitializePowerManager(service);
+
+           /* Step 2: Load persisted CEC settings. */
+           loadSettings();
+
+           /* Step 3: Open COM-RPC link to DeviceSettings plugin.
+            * Remaining init (hdmiInputs, CEC enable, threads) is deferred to
+            * InitializeAfterDSReady(), which is called from OnDeviceSettingsActivated()
+            * once the DS plugin is ready — mirroring the synchronous
+            * device::Manager::Initialize() sequence used by the DS_IARM path. */
+           _service = service;
            const uint32_t dsResult = DeviceSettingsClientHelper::Open(service);
            if (dsResult != Core::ERROR_NONE) {
                LOGWARN("HdmiCecSink: Failed to open DeviceSettings COM-RPC link (result=%u)", dsResult);
            }
 
-           // load persistence setting
-           loadSettings();
-
-           m_sendKeyEventThreadExit = false;
-           m_sendKeyEventThread = std::thread(threadSendKeyEvent);
-
-		   /* marking as intended*/
-           /* coverity[MISSING_LOCK : FALSE] */
-           m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
-           m_semSignaltoArcRoutingThread.acquire();
-           m_arcRoutingThread = std::thread(threadArcRouting);
-
-           m_audioStatusDetectionTimer.connect( std::bind( &HdmiCecSinkImplementation::audioStatusTimerFunction, this ) );
-           m_audioStatusDetectionTimer.setSingleShot(true);
-           m_arcStartStopTimer.connect( std::bind( &HdmiCecSinkImplementation::arcStartStopTimerFunction, this ) );
-           m_arcStartStopTimer.setSingleShot(true);
-
-            // get power state:
-            uint32_t res = Core::ERROR_GENERAL;
-            PowerState pwrStateCur = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
-            PowerState pwrStatePrev = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
-
-            ASSERT (_powerManagerPlugin);
-            if (_powerManagerPlugin) {
-                res = _powerManagerPlugin->GetPowerState(pwrStateCur, pwrStatePrev);
-                if (Core::ERROR_NONE == res) {
-                    powerState = (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON) ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF;
-                    LOGINFO("Current state is PowerManagerPlugin: (%d) powerState :%d \n", pwrStateCur, powerState);
-                }
-            }
-
-            if (cecSettingEnabled)
-            {
-               try
-               {
-                   CECEnable();
-               }
-               catch(...)
-               {
-                   LOGWARN("Exception while enabling CEC settings .\r\n");
-               }
-            }
-            getCecVersion();
-
-	    _userSettingsPlugin = service->QueryInterfaceByCallsign<Exchange::IUserSettings>("org.rdk.UserSettings");
-            if (nullptr == _userSettingsPlugin) {
-                LOGERR("Failed to get UserSettings interface");
-            }
-           else
-           {
-			       _userSettingsPlugin->Register(&_userSettingsNotification);
-                   LOGINFO("Successfully registered for UserSettings notifications");
-
-                   string presentationLanguage, isoLang;
-                   uint32_t status = _userSettingsPlugin->GetPresentationLanguage(presentationLanguage);
-                   if (status == Core::ERROR_NONE) {
-					   isoLang = mapToIso639_2(presentationLanguage);
-					   LOGINFO("Successfully retrieved the Presentation language from the userSettings plugin - BCP47: %s, ISO 639-2: %s", presentationLanguage.c_str(), isoLang.c_str());
-					   setCurrentLanguage(Language(isoLang.data()));
-					   sendMenuLanguage();
-                   }
-                   else {
-                           LOGERR("Failed to get presentation language: %u", status);
-                   }
-           }
-
-            LOGINFO(" HdmiCecSinkImplementation plugin Initialize completed \n");
-            return Core::ERROR_NONE;
-
+           LOGINFO("HdmiCecSink Configure done, waiting for OnDeviceSettingsActivated\n");
+           return Core::ERROR_NONE;
        }
 
        Core::hresult HdmiCecSinkImplementation::Register(Exchange::IHdmiCecSink::INotification* notification)
@@ -1956,12 +1898,29 @@ namespace WPEFramework
         {
             bool isAnyPortConnected = false;
 
+            /* COM-RPC path: query real port states live via GetHDMIInStatus(),
+             * mirroring the DS_IARM path which calls isPortConnected() each time.
+             * This eliminates all cache-consistency issues. */
+            auto* hdmiIn = AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
+            if (hdmiIn) {
+                Exchange::IDeviceSettingsHDMIIn::HDMIInStatus hdmiStatus;
+                Exchange::IDeviceSettingsHDMIIn::IHDMIInPortConnectionStatusIterator* portConnStatus = nullptr;
+                if (hdmiIn->GetHDMIInStatus(hdmiStatus, portConnStatus) == Core::ERROR_NONE
+                        && portConnStatus != nullptr) {
+                    int portIdx = 0;
+                    Exchange::IDeviceSettingsHDMIIn::HDMIPortConnectionStatus portStatus;
+                    while (portConnStatus->Next(portStatus) && portIdx < m_numofHdmiInput) {
+                        hdmiInputs[portIdx].update(portStatus.isPortConnected);
+                        portIdx++;
+                    }
+                    portConnStatus->Release();
+                }
+                hdmiIn->Release();
+            }
+
             for( int i = 0; i < m_numofHdmiInput; i++ )
             {
                 LOGINFO("update Port Status [%d] \n", i);
-                /* COM-RPC path: port connection status already cached from
-                 * OnDeviceSettingsActivated / OnHDMIInEventHotPlug. */
-
                 LOGINFO("Is HDMI In Port [%d] connected [%d] \n",i, hdmiInputs[i].m_isConnected);
 				if (i == 0 && hdmiInputs[i].m_isConnected == 1) {
              		t2_event_d("HDMI_INFO_PORT1connected", 1);
@@ -3628,6 +3587,87 @@ namespace WPEFramework
 
 namespace WPEFramework { namespace Plugin {
 
+/* Called once from OnDeviceSettingsActivated() after hdmiInputs is built.
+ * Performs all initialisation that requires DS to be ready, mirroring the
+ * synchronous device::Manager::Initialize() sequence used by the DS_IARM path:
+ *   DS_IARM:  Configure() → Manager::Init() → hdmiInputs → CEC
+ *   DS_COMRPC: Configure() → Open() → (async) → OnActivated → hdmiInputs → here → CEC
+ */
+void HdmiCecSinkImplementation::InitializeAfterDSReady()
+{
+    if (_dsReadyInitialized) {
+        LOGINFO("HdmiCecSink: InitializeAfterDSReady already done, skipping");
+        return;
+    }
+    _dsReadyInitialized = true;
+
+    /* Start worker threads. */
+    m_sendKeyEventThreadExit = false;
+    m_sendKeyEventThread = std::thread(threadSendKeyEvent);
+
+    /* marking as intended */
+    /* coverity[MISSING_LOCK : FALSE] */
+    m_currentArcRoutingState = ARC_STATE_ARC_TERMINATED;
+    m_semSignaltoArcRoutingThread.acquire();
+    m_arcRoutingThread = std::thread(threadArcRouting);
+
+    /* Connect one-shot timers. */
+    m_audioStatusDetectionTimer.connect( std::bind( &HdmiCecSinkImplementation::audioStatusTimerFunction, this ) );
+    m_audioStatusDetectionTimer.setSingleShot(true);
+    m_arcStartStopTimer.connect( std::bind( &HdmiCecSinkImplementation::arcStartStopTimerFunction, this ) );
+    m_arcStartStopTimer.setSingleShot(true);
+
+    /* Query current power state. */
+    uint32_t res = Core::ERROR_GENERAL;
+    PowerState pwrStateCur  = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+    PowerState pwrStatePrev = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+    ASSERT(_powerManagerPlugin);
+    if (_powerManagerPlugin) {
+        res = _powerManagerPlugin->GetPowerState(pwrStateCur, pwrStatePrev);
+        if (Core::ERROR_NONE == res) {
+            powerState = (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)
+                         ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF;
+            LOGINFO("HdmiCecSink InitializeAfterDSReady: powerState=%d\n", powerState);
+        }
+    }
+
+    /* Enable CEC — hdmiInputs is already populated so updateDeviceChain()
+     * will correctly associate CEC devices with HDMI-In ports. */
+    if (cecSettingEnabled) {
+        try {
+            CECEnable();
+        } catch(...) {
+            LOGWARN("Exception while enabling CEC settings.\r\n");
+        }
+    }
+    getCecVersion();
+
+    /* Register for UserSettings (presentation language). */
+    if (_service) {
+        _userSettingsPlugin = _service->QueryInterfaceByCallsign<Exchange::IUserSettings>("org.rdk.UserSettings");
+        if (nullptr == _userSettingsPlugin) {
+            LOGERR("Failed to get UserSettings interface");
+        } else {
+            _userSettingsPlugin->Register(&_userSettingsNotification);
+            LOGINFO("Successfully registered for UserSettings notifications");
+
+            string presentationLanguage, isoLang;
+            uint32_t status = _userSettingsPlugin->GetPresentationLanguage(presentationLanguage);
+            if (status == Core::ERROR_NONE) {
+                isoLang = mapToIso639_2(presentationLanguage);
+                LOGINFO("Presentation language BCP47: %s, ISO 639-2: %s",
+                        presentationLanguage.c_str(), isoLang.c_str());
+                setCurrentLanguage(Language(isoLang.data()));
+                sendMenuLanguage();
+            } else {
+                LOGERR("Failed to get presentation language: %u", status);
+            }
+        }
+    }
+
+    LOGINFO("HdmiCecSink InitializeAfterDSReady completed\n");
+}
+
 void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
 {
     LOGINFO("HdmiCecSink (DS_COMRPC): DeviceSettings plugin activated.");
@@ -3644,26 +3684,9 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
             for (int i = 0; i < m_numofHdmiInput; i++) {
                 hdmiInputs.emplace_back(static_cast<uint8_t>(i));
             }
-
-            {
-                Exchange::IDeviceSettingsHDMIIn::HDMIInStatus hdmiStatus;
-                Exchange::IDeviceSettingsHDMIIn::IHDMIInPortConnectionStatusIterator* portConnStatus = nullptr;
-                if (hdmiIn->GetHDMIInStatus(hdmiStatus, portConnStatus) == Core::ERROR_NONE
-                        && portConnStatus != nullptr) {
-                    int portIdx = 0;
-                    Exchange::IDeviceSettingsHDMIIn::HDMIPortConnectionStatus portStatus;
-                    while (portConnStatus->Next(portStatus) && portIdx < m_numofHdmiInput) {
-                        hdmiInputs[portIdx].update(portStatus.isPortConnected);
-                        LOGINFO("HdmiCecSink OnActivated: port[%d] isConnected=%s",
-                                portIdx, portStatus.isPortConnected ? "true" : "false");
-                        portIdx++;
-                    }
-                    portConnStatus->Release();
-                } else {
-                    LOGWARN("HdmiCecSink OnActivated: GetHDMIInStatus failed — port states default to disconnected");
-                }
-            }
-
+            /* Query live port-connection states — hdmiInputs is fully built here,
+             * exactly as DS_IARM does with CheckHdmiInState() in Configure()
+             * after device::Manager::Initialize(). */
             CheckHdmiInState();
             /* ARC port is the last HDMI-In port (same logic as getHdmiArcPortID). */
             HdmiArcPortID = (count > 0) ? static_cast<int32_t>(count - 1) : -1;
@@ -3676,6 +3699,11 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
     } else {
         LOGWARN("HdmiCecSink OnActivated: IDeviceSettingsHDMIIn unavailable");
     }
+
+    /* Now that hdmiInputs is populated, complete the rest of the initialization
+     * (threads, CEC enable, UserSettings).  Guarded so a DS plugin restart
+     * refreshes hdmiInputs/HdmiArcPortID but does not restart threads. */
+    InitializeAfterDSReady();
 }
 
 void HdmiCecSinkImplementation::OnDeviceSettingsDeactivated()

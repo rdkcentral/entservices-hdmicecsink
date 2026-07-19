@@ -687,7 +687,7 @@ namespace WPEFramework
              LOGERR("exception in thread join %s", e.what());
          }
             // Close COM-RPC link (unregisters notification delegate internally)
-            DeviceSettingsClientHelper::Close();
+            DSHelper::Close();
             HdmiCecSinkImplementation::_instance = nullptr;
             /* No device::Manager::DeInitialize() needed in COM-RPC path */
        }
@@ -727,7 +727,7 @@ namespace WPEFramework
             * once the DS plugin is ready — mirroring the synchronous
             * device::Manager::Initialize() sequence used by the DS_IARM path. */
            _service = service;
-           const uint32_t dsResult = DeviceSettingsClientHelper::Open(service);
+           const uint32_t dsResult = DSHelper::Open(service);
            if (dsResult != Core::ERROR_NONE) {
                LOGWARN("HdmiCecSink: Failed to open DeviceSettings COM-RPC link (result=%u)", dsResult);
            }
@@ -1901,7 +1901,7 @@ namespace WPEFramework
             /* COM-RPC path: query real port states live via GetHDMIInStatus(),
              * mirroring the DS_IARM path which calls isPortConnected() each time.
              * This eliminates all cache-consistency issues. */
-            auto* hdmiIn = AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
+            auto* hdmiIn = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
             if (hdmiIn) {
                 Exchange::IDeviceSettingsHDMIIn::HDMIInStatus hdmiStatus;
                 Exchange::IDeviceSettingsHDMIIn::IHDMIInPortConnectionStatusIterator* portConnStatus = nullptr;
@@ -3583,7 +3583,7 @@ namespace WPEFramework
     } // namespace Plugin
 } // namespace WPEFramework
 
-// ── DeviceSettingsClientHelper lifecycle callbacks ────────────────────────────
+// ── DSHelper lifecycle callbacks ────────────────────────────
 
 namespace WPEFramework { namespace Plugin {
 
@@ -3672,7 +3672,7 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
 {
     LOGINFO("HdmiCecSink (DS_COMRPC): DeviceSettings plugin activated.");
 
-    auto* hdmiIn = AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
+    auto* hdmiIn = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
     if (hdmiIn) {
         /* Register for HDMI-In hotplug events. */
         hdmiIn->Register(&_dsHdmiInNotification);

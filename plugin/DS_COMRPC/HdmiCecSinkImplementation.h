@@ -43,7 +43,7 @@
 #include "PowerManagerInterface.h"
 #include <interfaces/IHdmiCecSink.h>
 /* COM-RPC DeviceSettings client helper and HDMI-In interface */
-#include "DeviceSettingsClientHelper.h"
+#include "DeviceSettingsInterface.h"
 #include <interfaces/IDeviceSettingsHDMIIn.h>
 
 using namespace WPEFramework;
@@ -485,7 +485,7 @@ private:
         // will receive a JSONRPC message as a notification, in case this method is called.
         class HdmiCecSinkImplementation
             : public Exchange::IHdmiCecSink
-            , public DeviceSettingsClientHelper   // COM-RPC link to entservices-devicesettings
+            , public DSHelper   // COM-RPC link to entservices-devicesettings
         {
 
         enum {
@@ -805,7 +805,7 @@ private:
         void onHdmiInEventHotPlug(Exchange::IDeviceSettingsHDMIIn::HDMIInPort port, bool isConnected);
 
     protected:
-        /* DeviceSettingsClientHelper lifecycle callbacks */
+        /* DSHelper lifecycle callbacks */
         void OnDeviceSettingsActivated() override;
         void OnDeviceSettingsDeactivated() override;
 

@@ -11,7 +11,7 @@ on:
 env:
   BUILD_TYPE: Debug
   REPO_NAME: "hdmicecsink"
-  THUNDER_REF: "R4.4.1"
+  THUNDER_REF: "R4.4.6"
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
@@ -114,14 +114,14 @@ jobs:
         with:
           repository: rdkcentral/ThunderTools
           path: ThunderTools
-          ref: R4.4.3
+          ref: R4.4.6
 
       - name: Checkout entservices-testframework
         uses: actions/checkout@v3
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 1.0.17
+          ref: feature/RDKEMW-22169
 
       - name: Checkout entservices-hdmicecsink
         if: ${{ inputs.caller_source == 'local' }}
@@ -148,7 +148,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |  
           cd $GITHUB_WORKSPACE/ThunderTools
-          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/00010-R4.4-Add-support-for-project-dir.patch
+          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/00010-R4.4.6-Add-support-for-project-dir.patch
           cd -
 
       - name: Build ThunderTools
@@ -170,10 +170,9 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           cd $GITHUB_WORKSPACE/Thunder
-          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/Use_Legact_Alt_Based_On_ThunderTools_R4.4.3.patch
-          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/error_code_R4_4.patch
-          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/1004-Add-support-for-project-dir.patch
-          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/RDKEMW-733-Add-ENTOS-IDS.patch
+          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/error_code_R4_4_6.patch
+          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/1004-R4.4.6-Add-support-for-project-dir.patch
+          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/Jsonrpc_dynamic_error_handling_R4.4.6.patch
           cd -
 
       - name: Build Thunder

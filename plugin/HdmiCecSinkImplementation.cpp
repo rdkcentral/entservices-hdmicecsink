@@ -702,7 +702,15 @@ namespace WPEFramework
          {
              LOGERR("exception in thread join %s", e.what());
          }
-            device::Host::getInstance().UnRegister(baseInterface<device::Host::IHdmiInEvents>());
+            //coverity fix: Uncaught exception - wrap UnRegister call in try-catch
+            try
+            {
+                device::Host::getInstance().UnRegister(baseInterface<device::Host::IHdmiInEvents>());
+            }
+            catch(const std::exception& e)
+            {
+                LOGERR("exception in UnRegister %s", e.what());
+            }
             HdmiCecSinkImplementation::_instance = nullptr;
 
              try
@@ -3088,7 +3096,8 @@ namespace WPEFramework
 
         void HdmiCecSinkImplementation::CECDisable(void)
         {
-            std::lock_guard<std::mutex> lock(m_enableMutex);
+            //coverity fix: SLEEP - use unique_lock instead of lock_guard to allow unlocking before sleep
+            std::unique_lock<std::mutex> lock(m_enableMutex);
             JsonObject params;
             LOGINFO("Entered CECDisable ");
             if(!cecEnableStatus)
@@ -3100,10 +3109,12 @@ namespace WPEFramework
             if(m_currentArcRoutingState != ARC_STATE_ARC_TERMINATED)
             {
                 stopArc();
-                /* coverity[sleep : FALSE] */
+                //coverity fix: SLEEP - unlock before waiting to avoid holding lock during sleep
+                lock.unlock();
                 while (m_currentArcRoutingState != ARC_STATE_ARC_TERMINATED) {
                     usleep(500000);
                 }
+                lock.lock();
             }
 
             LOGINFO(" CECDisable ARC stopped ");

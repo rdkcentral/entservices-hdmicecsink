@@ -2758,7 +2758,10 @@ namespace WPEFramework
                 case POLL_THREAD_STATE_POLL :
                 {
                     //LOGINFO("POLL_THREAD_STATE_POLL");
-                    _instance->allocateLogicalAddress(DeviceType::TV);
+		    if(m_logicalAddressAllocated == LogicalAddress::UNREGISTERED || m_logicalAddressAllocated == LogicalAddress::SPECIFIC_USE)
+                    {
+                        _instance->allocateLogicalAddress(DeviceType::TV);
+                    }
                     if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED)
                     {
                         try{

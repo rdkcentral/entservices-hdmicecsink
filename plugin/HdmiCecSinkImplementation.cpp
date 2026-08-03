@@ -3096,8 +3096,7 @@ namespace WPEFramework
 
         void HdmiCecSinkImplementation::CECDisable(void)
         {
-            //coverity fix: SLEEP - use unique_lock instead of lock_guard to allow unlocking before sleep
-            std::unique_lock<std::mutex> lock(m_enableMutex);
+            std::lock_guard<std::mutex> lock(m_enableMutex);
             JsonObject params;
             LOGINFO("Entered CECDisable ");
             if(!cecEnableStatus)
@@ -3109,12 +3108,10 @@ namespace WPEFramework
             if(m_currentArcRoutingState != ARC_STATE_ARC_TERMINATED)
             {
                 stopArc();
-                //coverity fix: SLEEP - unlock before waiting to avoid holding lock during sleep
-                lock.unlock();
+                /* coverity[sleep : FALSE] */
                 while (m_currentArcRoutingState != ARC_STATE_ARC_TERMINATED) {
                     usleep(500000);
                 }
-                lock.lock();
             }
 
             LOGINFO(" CECDisable ARC stopped ");

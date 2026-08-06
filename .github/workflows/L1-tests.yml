@@ -11,7 +11,6 @@ on:
 env:
   BUILD_TYPE: Debug
   REPO_NAME: "hdmicecsink"
-  THUNDER_REF: "R4.4.6"
   INTERFACES_REF: "develop"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}

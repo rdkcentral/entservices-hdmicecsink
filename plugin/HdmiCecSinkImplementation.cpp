@@ -2757,12 +2757,13 @@ namespace WPEFramework
 
                 case POLL_THREAD_STATE_POLL :
                 {
-                    //LOGINFO("POLL_THREAD_STATE_POLL");
+                    LOGERR("allocate logical addres called in POLL_THREAD_STATE_POLL");
+                    usleep(8000000);
                     _instance->allocateLogicalAddress(DeviceType::TV);
                     if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED)
                     {
                         try{
-                            
+                            LOGERR("add logical address called");
                             logicalAddress = LogicalAddress(_instance->m_logicalAddressAllocated);
                             LibCCEC::getInstance().addLogicalAddress(logicalAddress);
                             _instance->smConnection->setSource(logicalAddress);
@@ -2964,6 +2965,7 @@ namespace WPEFramework
 
         void HdmiCecSinkImplementation::allocateLAforTV()
         {
+	    LOGERR("Allocate LA for TV where the polling happens for getting LA");
             bool gotLogicalAddress = false;
             int addr = LogicalAddress::TV;
             int i, j;

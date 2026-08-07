@@ -702,7 +702,6 @@ namespace WPEFramework
          {
              LOGERR("exception in thread join %s", e.what());
          }
-            //coverity fix: Uncaught exception - wrap UnRegister call in try-catch
             try
             {
                 device::Host::getInstance().UnRegister(baseInterface<device::Host::IHdmiInEvents>());
@@ -710,6 +709,10 @@ namespace WPEFramework
             catch(const std::exception& e)
             {
                 LOGERR("exception in UnRegister %s", e.what());
+            }
+		    catch(...)
+            {
+                LOGERR("unknown exception in UnRegister");
             }
             HdmiCecSinkImplementation::_instance = nullptr;
 

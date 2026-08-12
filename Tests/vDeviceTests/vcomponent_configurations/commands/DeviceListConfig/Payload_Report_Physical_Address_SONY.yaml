@@ -1,0 +1,9 @@
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(ReportPhysicalAddress) from SONY (LA=4, PlaybackDevice, sink HDMI input 2)"
+  message:
+    user_defined: true
+    # Header 0x4F: initiator=4 (SONY, Playback Device 1), destination=0xF (broadcast)
+    # Opcode 0x84: ReportPhysicalAddress
+    # Physical 3.0.0.0 -> 0x30,0x00, device_type PlaybackDevice=0x04
+    payload: ["0x4F", "0x84", "0x30", "0x00", "0x04"]

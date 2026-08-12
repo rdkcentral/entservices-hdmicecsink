@@ -1,0 +1,82 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# Updates a peer that is ALREADY in the vComponent's device map, in one post: it
+# sets that peer's power state and marks it faulted. Flows reach for this
+# document as the state-change or verification step straight after a frame
+# injection or a topology change, which is what makes it the most-posted fixture
+# in the suite this one was modelled on.
+#
+# The device name is a cross-document contract rather than a label.
+# Device_Add.yaml adds this peer beneath the YAMAHA audio system, and the matched
+# Device_Remove.yaml takes it away again, so both of them and this document have
+# to name "GameConsole" together. Change it in one place only and the update
+# addresses a device that is not in the map - which is not rejected, it simply
+# has no effect. Note that the peer is NOT declared in
+# Device_Config_Add_Network.yaml: it exists only between the add and the remove,
+# so this document is only meaningful in that window.
+#
+# No role inversion was needed. The document this was modelled on already
+# targets a source-role peer, so the name carries over unchanged, and no
+# television-role literal belongs here: the sink under test IS the television,
+# since allocateLAforTV() claims LogicalAddress::TV for the plugin itself, so no
+# emulated peer may hold that role.
+#
+# power_status is "off" while both documents above declare this peer "on", and
+# the difference is load-bearing.
+# HdmiCecSinkProcessor::process(ReportPowerStatus) compares the stored status
+# against the reported one and calls sendDeviceUpdateInfo() only when the two
+# differ, so a status the peer already holds would fan out nothing at all.
+#
+# fault is spelled as the bare word yes to match this template - Device_Add.yaml
+# writes no the same way - while active_source elsewhere in the tree is written
+# false/true. The two spellings are EQUIVALENT to a YAML 1.1 parser: yes/no and
+# true/false both load as booleans, so this is a house-style choice rather than a
+# semantic one, and the reason to leave each document as it is written is
+# consistency with the emulator's own templates rather than any parsing risk. The
+# power change and the fault are deliberately a single post: nothing here clears
+# the fault, because the fixture that clears one is
+# Device_Setapi_Open_Pass.yaml and it targets VTV, the emulated device under test
+# rather than a peer.
+#
+# The filename is part of the contract too. utils.HDMICEC_CMD_BASE resolves to
+# this directory and a consumer posts the literal "Device_Status.yaml" joined
+# onto it; a renamed document does not fail loudly, the post comes back
+# not-found and the step is silently skipped, costing coverage with nothing to
+# show for it. The document is self-contained for the same reason - one YAML
+# document, no anchors, aliases or includes - because send_vcomponent_command()
+# posts these bytes verbatim and the vComponent parses them on their own.
+# THE PEER NAMED BELOW IS THE TEST-ONLY PEER Device_Add.yaml CREATES, and its name has to be the
+# one that document and Device_Remove.yaml use: "GameConsole". Renaming it in this document alone
+# would leave it addressing a peer that is not in the map, and the vComponent does not reject an
+# update for an unknown device - it simply has no effect, so the power-status change this document
+# exists to make would silently stop happening. There is no CECAdapter and no GameConsole in
+# Device_Config_Add_Network.yaml, which declares exactly six peers - SAMSUNG, YAMAHA, DENON,
+# PANASONIC, LG and SONY beneath VTV - so the name cannot collide with a declared peer.
+# Init_Devicelist_Populate.verify_topology_consistency() checks those SIX declared peers against
+# the seed table and their payload documents; it says nothing about this test-only peer, which
+# exists only between the add and the remove.
+HdmiCec:
+  command: update_device_status
+  description: Updates the status of an HDMI CEC device
+  device:
+    name: "GameConsole"
+    power_status: "off"
+    fault: yes

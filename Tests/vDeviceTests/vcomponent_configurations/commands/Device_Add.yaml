@@ -1,0 +1,76 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# Adds one HDMI-CEC peer to the vComponent's device map at run time, after the map has
+# already been configured. This document and Device_Remove.yaml are a matched pair, and
+# Device_Status.yaml updates the same peer, so all three name "GameConsole".
+#
+# "GameConsole" IS DELIBERATELY ABSENT FROM THE CONFIGURED TOPOLOGY.
+# Device_Config_Add_Network.yaml declares six peers and this is not one of them, which is
+# what makes the add a real population change rather than a re-announcement of something
+# already present - and what lets a consumer verify the peer by its logical address
+# appearing where it was absent before. It does have a reserved slot there: port 4 of the
+# audio system is left free for exactly this document.
+#
+# The filename is part of the contract rather than a label: utils.HDMICEC_CMD_BASE
+# resolves to this directory and a consumer posts the literal "Device_Add.yaml" joined
+# onto it. A renamed document does not fail loudly - the post comes back not-found and
+# the step is silently skipped, costing coverage with nothing to show for it.
+#
+# parent: names the node the new peer attaches beneath, and it is load-bearing in three
+# separate ways.
+#   * It must name a device that exists in the map. "YAMAHA" is the AudioSystem peer that
+#     Device_Config.yaml and Device_Config_Add_Network.yaml both declare, at logical
+#     address 5 and physical address 2.0.0.0. A parent that is not in the map is not
+#     rejected - the peer simply attaches to nothing and the add silently does nothing.
+#   * It must NOT be the emulated television. HandleStateMessages refuses an add whose
+#     parent is the emulated device once that device's number_children has reached the
+#     port count (vcHdmiCec.c:274-282); parenting beneath a peer bypasses that guard
+#     entirely, and the television's three ports are already occupied.
+#   * With port_id 4 beneath a parent at 2.0.0.0 the new peer lands at 2.4.0.0 and is
+#     allocated PLAYBACKDEVICE3 (11), because PlaybackDevice 4 and 8 are held by SONY and
+#     PANASONIC. A second address byte of 4 rather than 0 is also what puts this peer one
+#     level BELOW an HDMI input rather than directly on one, which is the only way
+#     Device_Remove.yaml can reach removeDevice()'s HdmiPortMap::removeChild arm.
+# The device under test is the television, not a peer:
+# HdmiCecSinkImplementation::allocateLAforTV() claims LogicalAddress::TV for the sink
+# itself and it holds physical address 0.0.0.0, so no emulated peer may take that role.
+# device_type is correspondingly one of the four source-role types this tree admits -
+# AudioSystem, PlaybackDevice, RecordingDevice or Tuner.
+#
+# One precondition is deliberately NOT encoded here. addDevice() returns early while
+# m_logicalAddressAllocated == LogicalAddress::UNREGISTERED, so the plugin must already
+# have been enabled and have claimed its logical address before this document is posted,
+# or the OnDeviceAdded notification never fires. Init_Devicelist_Populate.py owns that
+# sequencing; a static fixture cannot express it.
+HdmiCec:
+  command: add_device
+  description: Add a new HDMI CEC device to the device map
+  device:
+    name: "GameConsole"
+    parent: "YAMAHA"
+    language: "eng"
+    cec_version: "1.4"
+    device_type: "PlaybackDevice"
+    power_status: "on"
+    fault: no
+    port_id: 4
+    number_of_ports: 0
+    active_source: false

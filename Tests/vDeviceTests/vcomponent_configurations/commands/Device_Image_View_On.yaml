@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Inject ImageViewOn (CEC opcode 0x04) - also used as power-on signal
+  message:
+    user_defined: true
+    payload: ["0x50", "0x04"]

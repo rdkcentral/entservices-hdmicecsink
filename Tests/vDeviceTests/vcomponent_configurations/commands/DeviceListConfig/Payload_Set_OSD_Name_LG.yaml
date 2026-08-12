@@ -1,0 +1,52 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# THE ONE AUTHORITATIVE TOPOLOGY lives in ../Device_Config_Add_Network.yaml. Every address in
+# this document is copied from the derivation table in that file's header and from nowhere else:
+#
+#   peer       device_type      parent  port  physical  logical
+#   ---------  ---------------  ------  ----  --------  -------
+#   SAMSUNG    Tuner            VTV      1    1.0.0.0      3
+#   YAMAHA     AudioSystem      VTV      2    2.0.0.0      5
+#   SONY       PlaybackDevice   VTV      3    3.0.0.0      4
+#   DENON      RecordingDevice  YAMAHA   1    2.1.0.0      1
+#   PANASONIC  PlaybackDevice   YAMAHA   2    2.2.0.0      8
+#   LG         RecordingDevice  YAMAHA   3    2.3.0.0      2
+#
+# A logical address, a physical address or a device type changed here without the same change in
+# the network document leaves two files describing different devices, and the drift is not inert:
+# an operand carried by <Report Physical Address> is written straight into
+# deviceList[la].m_physicalAddr (HdmiCecSinkImplementation.cpp:366-367), so a stale operand MOVES
+# the peer rather than merely reading wrong.
+#
+# <Set OSD Name> filling in LG's human-readable name on an entry that
+# Payload_Report_Physical_Address_LG.yaml has already registered.
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(SetOSDName) from LG (LA=2, Recording Device) - OSD name 'LG'"
+  message:
+    user_defined: true
+    # 0x20  header: initiator 2 (LG), destination 0 - the sink television. This one is
+    #       DIRECTED: process(SetOSDName) discards broadcasts (HdmiCecSinkImplementation.cpp:307)
+    #       exactly where process(ReportPhysicalAddress) and process(DeviceVendorID) discard
+    #       directed frames, so the three payloads for one peer are not addressed alike.
+    # 0x47  opcode <Set OSD Name>.
+    # "0x4C", "0x47"  "LG" in ASCII.
+    payload: ["0x20", "0x47", "0x4C", "0x47"]

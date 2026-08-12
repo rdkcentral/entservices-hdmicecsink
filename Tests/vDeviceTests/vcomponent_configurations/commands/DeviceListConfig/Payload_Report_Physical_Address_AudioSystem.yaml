@@ -1,0 +1,67 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# THE ONE AUTHORITATIVE TOPOLOGY lives in ../Device_Config_Add_Network.yaml. Every address in
+# this document is copied from the derivation table in that file's header and from nowhere else:
+#
+#   peer       device_type      parent  port  physical  logical
+#   ---------  ---------------  ------  ----  --------  -------
+#   SAMSUNG    Tuner            VTV      1    1.0.0.0      3
+#   YAMAHA     AudioSystem      VTV      2    2.0.0.0      5
+#   SONY       PlaybackDevice   VTV      3    3.0.0.0      4
+#   DENON      RecordingDevice  YAMAHA   1    2.1.0.0      1
+#   PANASONIC  PlaybackDevice   YAMAHA   2    2.2.0.0      8
+#   LG         RecordingDevice  YAMAHA   3    2.3.0.0      2
+#
+# A logical address, a physical address or a device type changed here without the same change in
+# the network document leaves two files describing different devices, and the drift is not inert:
+# an operand carried by <Report Physical Address> is written straight into
+# deviceList[la].m_physicalAddr (HdmiCecSinkImplementation.cpp:366-367), so a stale operand MOVES
+# the peer rather than merely reading wrong.
+#
+# <Report Physical Address> announcing YAMAHA to the sink television.
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(ReportPhysicalAddress) from YAMAHA (LA=5, Audio System) at 2.0.0.0"
+  message:
+    user_defined: true
+    # Raw frame, injected byte for byte. The vComponent synthesises operands only for
+    # <Active Source>, <Inactive Source> and <Set OSD Name> (vcHdmiCec.c ParseCommand), so a
+    # <Report Physical Address> has to spell its own out.
+    #
+    # 0x5F  header: initiator 5 (YAMAHA), destination 0xF (broadcast).
+    #       process(ReportPhysicalAddress) discards directed frames outright
+    #       (HdmiCecSinkImplementation.cpp:351-353), so broadcast is not a stylistic choice.
+    # 0x84  opcode <Report Physical Address>.
+    # 0x20, 0x00  physical address 2.0.0.0, which is what ../Device_Config_Add_Network.yaml
+    #       allocates to this peer (the television, port 2). Two wire bytes of four nibbles - byte 0
+    #       is n0<<4|n1, byte 1 is n2<<4|n3 (Operands.hpp PhysicalAddress).
+#       2.0.0.0 is the television's SECOND HDMI input and is not interchangeable:
+#       process(InitiateArc) derives the ARC port's address from HdmiArcPortID
+#       (HdmiCecSinkImplementation.cpp:508-534) and engages the ARC path only when
+#       deviceList[0x5].m_physicalAddr matches it. This suite pins that port to HDMI
+#       input 1 in test_HdmiCecSink.cpp:857-868 and HdmiCecSink_L2Test.cpp:1466-1479 and :1740-1751,
+#       each stubbing getHDMIARCPortId to 1 and reporting only port 1 connected.
+    # 0x05  device type Audio System, the family logical address 5 belongs to
+    #       (Operands.hpp LogicalAddress::getType). process(ReportPhysicalAddress) stores this byte
+    #       verbatim into deviceList[5].m_deviceType (cpp:367) and getDeviceList reports it, so an
+    #       address paired with a device type it cannot hold is observable through the published
+    #       API.
+    payload: ["0x5F", "0x84", "0x20", "0x00", "0x05"]

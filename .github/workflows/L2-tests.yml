@@ -112,7 +112,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 2.0.0
+          ref: feature/thunder-01
 
       - name: Checkout googletest
         if: steps.cache.outputs.cache-hit != 'true'
@@ -135,6 +135,12 @@ jobs:
           cmake --build build/ThunderTools -j8
           &&
           cmake --install build/ThunderTools
+
+      - name: Apply patches Thunder
+        run: |
+          cd $GITHUB_WORKSPACE/Thunder
+          patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/1004-R4_4-RDK-Add-support-for-project-dir.patch
+          cd-
 
       - name: Build Thunder
         run: >

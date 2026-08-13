@@ -740,7 +740,7 @@ readonly L2_EXCLUDES=(
 #   had no test.  Those two are Information() (HdmiCecSink.cpp:166-169), and the reason they
 #   went untested is that Thunder never calls the method: PluginHost::IPlugin::Information() is
 #   pure virtual at Thunder/Source/plugins/IPlugin.h:97 and is called NOWHERE in Thunder
-#   R4.4.1 -- a grep of Thunder/Source finds only the Controller's own override.  It is
+#   R4_4-RDK -- a grep of Thunder/Source finds only the Controller's own override.  It is
 #   nevertheless REACHABLE from L2, because the plugin publishes
 #   INTERFACE_ENTRY(PluginHost::IPlugin) (HdmiCecSink.h:257-261),
 #   Server::Service::QueryInterface forwards any non-IUnknown/IShell id to the plugin handler

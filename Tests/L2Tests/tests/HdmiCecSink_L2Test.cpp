@@ -7952,7 +7952,7 @@ TEST_F(HdmiCecSink_L2Test, PluginRefusesToActivateUnderANonSinkProfile)
  *
  * WHY THIS CASE EXISTS AT L2 AT ALL, since nothing in the host ever calls the method.
  * PluginHost::IPlugin::Information() is declared pure virtual at Thunder/Source/plugins/IPlugin.h:97
- * and is called NOWHERE in Thunder R4.4.1 - a grep of Thunder/Source finds only the Controller's own
+ * and is called NOWHERE in Thunder R4_4-RDK - a grep of Thunder/Source finds only the Controller's own
  * override (Controller.cpp:176).  So no amount of activating, deactivating or driving the plugin
  * reaches it, and the two instrumented lines of this plugin's override were the whole of the
  * difference between this file's L2 figure and the 80% bar: 46/59 = 78.0% without them, 48/59 =

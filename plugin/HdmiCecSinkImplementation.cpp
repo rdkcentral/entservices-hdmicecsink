@@ -3186,7 +3186,6 @@ namespace WPEFramework
 
             if(1 == libcecInitStatus)
             {
-				lock.unlock();
                 try
                 {
                    LibCCEC::getInstance().term();
@@ -3200,7 +3199,6 @@ namespace WPEFramework
                 catch(...){
                     LOGWARN("Exception caught in LibCCEC::term");
                 }
-				lock.lock();
 
                 libcecInitStatus--;
                 LOGWARN("CEC Disabled %d",libcecInitStatus); 

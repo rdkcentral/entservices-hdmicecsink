@@ -140,7 +140,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/Thunder
           patch -p1 < $GITHUB_WORKSPACE/entservices-testframework/patches/1004-R4_4-RDK-Add-support-for-project-dir.patch
-          cd-
+          cd -
 
       - name: Build Thunder
         run: >

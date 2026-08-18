@@ -663,7 +663,19 @@ namespace WPEFramework
                    _userSettingsPlugin = nullptr;
            }
      
-         CECDisable();
+         try
+         {
+             CECDisable();
+         }
+         catch(const std::exception& e)
+         {
+             LOGERR("exception in CECDisable during destructor: %s", e.what());
+         }
+         catch(...)
+         {
+             LOGERR("unknown exception in CECDisable during destructor");
+         }
+
          m_currentArcRoutingState = ARC_STATE_ARC_EXIT;
      
              m_semSignaltoArcRoutingThread.release();
@@ -702,7 +714,18 @@ namespace WPEFramework
          {
              LOGERR("exception in thread join %s", e.what());
          }
-            device::Host::getInstance().UnRegister(baseInterface<device::Host::IHdmiInEvents>());
+            try
+            {
+                device::Host::getInstance().UnRegister(baseInterface<device::Host::IHdmiInEvents>());
+            }
+            catch(const std::exception& e)
+            {
+                LOGERR("exception in UnRegister %s", e.what());
+            }
+		    catch(...)
+            {
+                LOGERR("unknown exception in UnRegister");
+            }
             HdmiCecSinkImplementation::_instance = nullptr;
 
              try

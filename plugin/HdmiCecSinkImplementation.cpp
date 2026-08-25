@@ -2769,7 +2769,7 @@ namespace WPEFramework
 
             while(1)
             {
-                if(!(devicePowerState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
+                if(!(devicePowerState.load() == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                 {
                     if (_instance->m_pollThreadExit || isExit ){
                         LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d",_instance->m_pollThreadExit,isExit,_instance->m_pollThreadState,_instance->m_pollNextState );
@@ -3459,7 +3459,7 @@ namespace WPEFramework
 
             while(!_instance->m_sendKeyEventThreadExit)
             {
-                if(!(devicePowerState == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
+                if(!(devicePowerState.load() == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                 {
                     
                     int uikey = KEY_UNSUPPORTED;

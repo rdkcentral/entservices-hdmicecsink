@@ -104,7 +104,7 @@ static float cecVersion = 1.4;
 static AllDeviceTypes allDevicetype = ALL_DEVICE_TYPES;
 static std::vector<RcProfile> rcProfile = {RC_PROFILE_TV};
 static std::vector<DeviceFeatures> deviceFeatures = {DEVICE_FEATURES_TV};
-static std::atomic<PowerState> devicePowerState{WPEFramework::Exchange::IPowerManager::POWER_STATE_ON};
+static std::atomic<WPEFramework::Exchange::IPowerManager::PowerState> devicePowerState{WPEFramework::Exchange::IPowerManager::POWER_STATE_ON};
 
 
 #define KEY_UNSUPPORTED 0xFF
@@ -2987,7 +2987,11 @@ namespace WPEFramework
                     else
                         LOGINFO("Thread is going to Exit m_pollThreadExit %d\n", _instance->m_pollThreadExit );
                 }
-                else{
+                else {
+                    if (_instance->m_pollThreadExit || isExit) {
+                        LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d", _instance->m_pollThreadExit, isExit, _instance->m_pollThreadState, _instance->m_pollNextState);
+                        break;
+                    }
                     usleep(10000);
                 }
             }
@@ -3616,8 +3620,14 @@ namespace WPEFramework
                         break;
                     }
                 }//if(devicePowerState.load() != WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
-                else{
-                    LOGINFO("[%s][%d]Device transitioning to Deep sleep, skipping until deepsleep is complete", __FUNCTION__, __LINE__);
+                else {
+                    {
+                        std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
+                        if (_instance->m_currentArcRoutingState == ARC_STATE_ARC_EXIT) {
+                            LOGINFO(" threadArcRouting EXITing");
+                            break;
+                        }
+                    }
                     usleep(10000);
                 }
             }//while(1)

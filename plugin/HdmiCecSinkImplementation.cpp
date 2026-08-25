@@ -38,6 +38,7 @@
 #include "dsError.h"
 
 #include <telemetry_busmessage_sender.h>
+#include <atomic>
 
 using CCECRequestActiveSource = ::RequestActiveSource;
 using CCECSetMenuLanguage = ::SetMenuLanguage;

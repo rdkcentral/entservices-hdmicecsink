@@ -3702,8 +3702,17 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
              * exactly as DS_IARM does with CheckHdmiInState() in Configure()
              * after device::Manager::Initialize(). */
             CheckHdmiInState();
-            /* ARC port is the last HDMI-In port (same logic as getHdmiArcPortID). */
-            HdmiArcPortID = (count > 0) ? static_cast<int32_t>(count - 1) : -1;
+
+            auto* audio = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsAudio>();
+            if (audio) {
+                int32_t arcPortID = -1;
+                int32_t audioHandle = -1;
+
+                if (audio->GetAudioHDMIARCPortId(audioHandle, arcPortID) == Core::ERROR_NONE) {
+                    HdmiArcPortID = arcPortID;
+                }
+                audio->Release();
+            }
             LOGINFO("HdmiCecSink OnActivated: m_numofHdmiInput=%d HdmiArcPortID=%d",
                     m_numofHdmiInput, HdmiArcPortID);
         } else {

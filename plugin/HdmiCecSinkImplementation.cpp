@@ -2781,11 +2781,14 @@ namespace WPEFramework
                 case POLL_THREAD_STATE_POLL :
                 {
                     //LOGINFO("POLL_THREAD_STATE_POLL");
-                    _instance->allocateLogicalAddress(DeviceType::TV);
+		    if(m_logicalAddressAllocated != LogicalAddress::TV)
+                    {
+                        LOGERR("cal allocateLAforTV Re-allocate only when TV logical address is not allocated with (0x0)");
+                        _instance->allocateLogicalAddress(DeviceType::TV);
+                    }
                     if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED)
                     {
                         try{
-                            
                             logicalAddress = LogicalAddress(_instance->m_logicalAddressAllocated);
                             LibCCEC::getInstance().addLogicalAddress(logicalAddress);
                             _instance->smConnection->setSource(logicalAddress);

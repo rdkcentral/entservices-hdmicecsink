@@ -806,16 +806,18 @@ namespace WPEFramework
            }
        }
 
-       /* COM-RPC hotplug callback — called from DSHDMIInNotification delegate. */
-       void HdmiCecSinkImplementation::onHdmiInEventHotPlug(
-               Exchange::IDeviceSettingsHDMIIn::HDMIInPort port, bool isConnected)
+       void HdmiCecSinkImplementation::dispatchEvent(Event ev, ParamsType params)
        {
-           if(!HdmiCecSinkImplementation::_instance)
-               return;
+           Core::IWorkerPool::Instance().Submit(DispatchJob::Create(this, ev, std::move(params)));
+       }
 
-           LOGINFO("Received HdmiCecSink::onHdmiInEventHotPlug (COM-RPC) port: %d isConnected: %d",
-                   static_cast<int>(port), isConnected);
-           HdmiCecSinkImplementation::_instance->onHdmiHotPlug(static_cast<int>(port), isConnected);
+       void HdmiCecSinkImplementation::Dispatch(Event ev, const ParamsType params)
+       {
+           if (!HdmiCecSinkImplementation::_instance) return;
+           if (ev == EV_HDMI_HOTPLUG) {
+               auto t = boost::get<std::tuple<int, int>>(params);
+               HdmiCecSinkImplementation::_instance->onHdmiHotPlug(std::get<0>(t), std::get<1>(t));
+           }
        }
 
        void HdmiCecSinkImplementation::onPresentationLanguageChanged(const string& presentationLanguage)
@@ -3689,7 +3691,7 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
     auto* hdmiIn = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
     if (hdmiIn) {
         /* Register for HDMI-In hotplug events. */
-        hdmiIn->Register(&_dsHdmiInNotification);
+        hdmiIn->Register("HdmiCecSink", &_dsHdmiInNotification);
         /* Get the real input count now that DS is available. */
         int32_t count = 0;
         if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE) {

@@ -45,6 +45,7 @@
 /* COM-RPC DeviceSettings client helper and HDMI-In interface */
 #include "DeviceSettingsInterface.h"
 #include <interfaces/IDeviceSettingsHDMIIn.h>
+#include <boost/variant.hpp>
 
 using namespace WPEFramework;
 using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
@@ -589,6 +590,29 @@ private:
                 INTERFACE_ENTRY(Exchange::IHdmiCecSink)
             END_INTERFACE_MAP
 
+            using ParamsType = boost::variant<std::tuple<int, int>>;
+            enum Event { EV_HDMI_HOTPLUG };
+
+            class EXTERNAL DispatchJob : public Core::IDispatch {
+            protected:
+                DispatchJob(HdmiCecSinkImplementation* impl, Event event, ParamsType params)
+                    : _impl(impl), _event(event), _params(std::move(params))
+                { if (_impl != nullptr) _impl->AddRef(); }
+            public:
+                DispatchJob() = delete;
+                DispatchJob(const DispatchJob&) = delete;
+                DispatchJob& operator=(const DispatchJob&) = delete;
+                ~DispatchJob() { if (_impl != nullptr) _impl->Release(); }
+                static Core::ProxyType<Core::IDispatch> Create(HdmiCecSinkImplementation* impl, Event event, ParamsType params) {
+                    return Core::ProxyType<Core::IDispatch>(Core::ProxyType<DispatchJob>::Create(impl, event, std::move(params)));
+                }
+                void Dispatch() override { _impl->Dispatch(_event, _params); }
+            private:
+                HdmiCecSinkImplementation* _impl;
+                Event _event;
+                const ParamsType _params;
+            };
+
         private:
             class PowerManagerNotification : public Exchange::IPowerManager::IModeChangedNotification {
                 private:
@@ -719,7 +743,8 @@ private:
             void OnHDMIInEventHotPlug(const Exchange::IDeviceSettingsHDMIIn::HDMIInPort port,
                                       const bool isConnected) override
             {
-                _parent.onHdmiInEventHotPlug(port, isConnected);
+                _parent.dispatchEvent(EV_HDMI_HOTPLUG,
+                    std::make_tuple(static_cast<int>(port), static_cast<int>(isConnected)));
             }
 
             BEGIN_INTERFACE_MAP(DSHDMIInNotification)
@@ -802,7 +827,8 @@ private:
         Core::hresult RequestAudioDevicePowerStatus(HdmiCecSinkSuccess &successResult) override;
 
 	 /*devicesetting COM-RPC callback: HDMI-In hotplug */
-        void onHdmiInEventHotPlug(Exchange::IDeviceSettingsHDMIIn::HDMIInPort port, bool isConnected);
+        void dispatchEvent(Event ev, ParamsType params);
+        void Dispatch(Event ev, const ParamsType params);
 
     protected:
         /* DSHelper lifecycle callbacks */

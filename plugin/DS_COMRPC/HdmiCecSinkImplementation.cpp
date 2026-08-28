@@ -737,7 +737,7 @@ namespace WPEFramework
             * once the DS plugin is ready — mirroring the synchronous
             * device::Manager::Initialize() sequence used by the DS_IARM path. */
            _service = service;
-           const uint32_t dsResult = DSHelper::Open(service);
+           const uint32_t dsResult = DSHelper::Open(service, "HdmiCecSink");
            if (dsResult != Core::ERROR_NONE) {
                LOGWARN("HdmiCecSink: Failed to open DeviceSettings COM-RPC link (result=%u)", dsResult);
            }

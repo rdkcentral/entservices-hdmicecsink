@@ -657,45 +657,56 @@ namespace WPEFramework
                    _userSettingsPlugin = nullptr;
            }
      
-         CECDisable();
-         m_currentArcRoutingState = ARC_STATE_ARC_EXIT;
+            try
+            {
+                CECDisable();
+            }
+            catch(const std::exception& e)
+            {
+                LOGERR("exception in CECDisable during destructor: %s", e.what());
+            }
+            catch(...)
+            {
+                LOGERR("unknown exception in CECDisable during destructor");
+            }
+            m_currentArcRoutingState = ARC_STATE_ARC_EXIT;
      
-             m_semSignaltoArcRoutingThread.release();
+            m_semSignaltoArcRoutingThread.release();
      
-             try
-         {
-         if (m_arcRoutingThread.joinable())
-             m_arcRoutingThread.join();
-         }
-         catch(const std::system_error& e)
-         {
-         LOGERR("system_error exception in thread join %s", e.what());
-         }
-         catch(const std::exception& e)
-         {
-         LOGERR("exception in thread join %s", e.what());
-         }
+            try
+            {
+               if (m_arcRoutingThread.joinable())
+                    m_arcRoutingThread.join();
+            }
+            catch(const std::system_error& e)
+            {
+                LOGERR("system_error exception in thread join %s", e.what());
+            }
+            catch(const std::exception& e)
+            {
+                LOGERR("exception in thread join %s", e.what());
+            }
      
-         {
-             m_sendKeyEventThreadExit = true;
-                 std::unique_lock<std::mutex> lk(m_sendKeyEventMutex);
-                 m_sendKeyEventThreadRun = true;
-                 m_sendKeyCV.notify_one();
-             }
-         
-         try
-         {
-             if (m_sendKeyEventThread.joinable())
-                 m_sendKeyEventThread.join();
-         }
-         catch(const std::system_error& e)
-         {
-             LOGERR("system_error exception in thread join %s", e.what());
-         }
-         catch(const std::exception& e)
-         {
-             LOGERR("exception in thread join %s", e.what());
-         }
+            {
+                m_sendKeyEventThreadExit = true;
+                std::unique_lock<std::mutex> lk(m_sendKeyEventMutex);
+                m_sendKeyEventThreadRun = true;
+                m_sendKeyCV.notify_one();
+            }
+            
+            try
+            {
+                if (m_sendKeyEventThread.joinable())
+                    m_sendKeyEventThread.join();
+            }
+            catch(const std::system_error& e)
+            {
+                LOGERR("system_error exception in thread join %s", e.what());
+            }
+            catch(const std::exception& e)
+            {
+                LOGERR("exception in thread join %s", e.what());
+            }
             // Close COM-RPC link (unregisters notification delegate internally)
             DSHelper::Close();
             HdmiCecSinkImplementation::_instance = nullptr;

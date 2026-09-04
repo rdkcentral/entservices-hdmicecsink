@@ -2993,7 +2993,7 @@ namespace WPEFramework
                         LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d", _instance->m_pollThreadExit, isExit, _instance->m_pollThreadState, _instance->m_pollNextState);
                         break;
                     }
-                    usleep(10000);
+                    usleep(200000);
                 }
             }
         }
@@ -3541,7 +3541,7 @@ namespace WPEFramework
                     }
                 }
                 else{
-                    usleep(10000);
+                    usleep(200000);
                 }
             }//while(!_instance->m_sendKeyEventThreadExit)
         }//threadSendKeyEvent
@@ -3629,7 +3629,7 @@ namespace WPEFramework
                             break;
                         }
                     }
-                    usleep(10000);
+                    usleep(200000); //200ms sleep
                 }
             }//while(1)
         }//threadArcRouting

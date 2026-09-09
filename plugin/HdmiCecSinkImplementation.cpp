@@ -3678,9 +3678,8 @@ void HdmiCecSinkImplementation::InitializeAfterDSReady()
         res = _powerManagerPlugin->GetPowerState(pwrStateCur, pwrStatePrev);
         if (Core::ERROR_NONE == res) {
             devicePowerState.store(pwrStateCur);
-            powerState.load() = (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)
-                         ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF;
-            LOGINFO("HdmiCecSink InitializeAfterDSReady: powerState=%d\n", powerState.load());
+            powerState.store((pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON) ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF);
+            LOGINFO("Current state is PowerManagerPlugin: (%d) powerState :%d \n", pwrStateCur, powerState.load());
         }
     }
 

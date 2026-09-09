@@ -38,6 +38,7 @@
 #include "dsError.h"
 
 #include <telemetry_busmessage_sender.h>
+#include <atomic>
 
 using CCECRequestActiveSource = ::RequestActiveSource;
 using CCECSetMenuLanguage = ::SetMenuLanguage;
@@ -95,7 +96,7 @@ static VendorID lgVendorId = {0x00,0xE0,0x91};
 static PhysicalAddress physical_addr = {0x0F,0x0F,0x0F,0x0F};
 static LogicalAddress logicalAddress = 0xF;
 static OSDName osdName = "TV Box";
-static int32_t powerState = DEVICE_POWER_STATE_OFF;
+static std::atomic<int32_t> powerState{DEVICE_POWER_STATE_OFF};
 static std::vector<uint8_t> formatid = {0,0};
 static std::vector<uint8_t> audioFormatCode = { SAD_FMT_CODE_ENHANCED_AC3,SAD_FMT_CODE_AC3 };
 static uint8_t numberofdescriptor = 2;
@@ -104,6 +105,8 @@ static float cecVersion = 1.4;
 static AllDeviceTypes allDevicetype = ALL_DEVICE_TYPES;
 static std::vector<RcProfile> rcProfile = {RC_PROFILE_TV};
 static std::vector<DeviceFeatures> deviceFeatures = {DEVICE_FEATURES_TV};
+static std::atomic<WPEFramework::Exchange::IPowerManager::PowerState> devicePowerState{WPEFramework::Exchange::IPowerManager::POWER_STATE_ON};
+
 
 #define KEY_UNSUPPORTED 0xFF
 
@@ -391,14 +394,14 @@ namespace WPEFramework
        }
        void HdmiCecSinkProcessor::process (const GiveDevicePowerStatus &msg, const Header &header)
        {
-             LOGINFO("Command: GiveDevicePowerStatus sending powerState :%d \n",powerState);
+             LOGINFO("Command: GiveDevicePowerStatus sending powerState :%d \n",powerState.load());
          if(header.to.toInt() == LogicalAddress::BROADCAST){
         LOGINFO("Ignore Broadcast messages, accepts only direct messages");
         return;
          }
              try
              { 
-                 conn.sendTo(header.from, MessageEncoder().encode(ReportPowerStatus(PowerStatus(powerState))));
+                 conn.sendTo(header.from, MessageEncoder().encode(ReportPowerStatus(PowerStatus(powerState.load()))));
              } 
              catch(...)
              {
@@ -805,8 +808,9 @@ namespace WPEFramework
             if (_powerManagerPlugin) {
                 res = _powerManagerPlugin->GetPowerState(pwrStateCur, pwrStatePrev);
                 if (Core::ERROR_NONE == res) {
-                    powerState = (pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON) ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF;
-                    LOGINFO("Current state is PowerManagerPlugin: (%d) powerState :%d \n", pwrStateCur, powerState);
+                    devicePowerState.store(pwrStateCur);
+                    powerState.store((pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON) ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF);
+                    LOGINFO("Current state is PowerManagerPlugin: (%d) powerState :%d \n", pwrStateCur, powerState.load());
                 }
             }
 
@@ -963,37 +967,38 @@ namespace WPEFramework
             LOGINFO("Event IARM_BUS_PWRMGR_EVENT_MODECHANGED: State Changed %d -- > %d\r",
                     currentState, newState);
             LOGWARN(" m_logicalAddressAllocated 0x%x CEC enable status %d \n",_instance->m_logicalAddressAllocated,_instance->cecEnableStatus);
+            devicePowerState.store(newState);
             if(newState == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)
             {
-                powerState = DEVICE_POWER_STATE_ON; 
+                powerState.store(DEVICE_POWER_STATE_ON); 
             }
             else
             {
-                    powerState = DEVICE_POWER_STATE_OFF;
+                    powerState.store(DEVICE_POWER_STATE_OFF);
                     /* marking as intended*/
                     /* coverity[MISSING_LOCK : FALSE] */
                     if((_instance->m_currentArcRoutingState == ARC_STATE_REQUEST_ARC_INITIATION) || (_instance->m_currentArcRoutingState == ARC_STATE_ARC_INITIATED))
                     {
                         LOGINFO("%s: Stop ARC \n",__FUNCTION__);
                         _instance->stopArc();
+                    }
+
             }
-
-                }
-                if (_instance->cecEnableStatus)
+            if (_instance->cecEnableStatus)
             {
-            if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED )
-            {
-                _instance->deviceList[_instance->m_logicalAddressAllocated].m_powerStatus = PowerStatus(powerState);
-
-                if ( powerState != DEVICE_POWER_STATE_ON )
+                if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED )
                 {
-                   /*  reset the current active source when TV on going to standby */
-                                   HdmiCecSinkImplementation::_instance->m_currentActiveSource = -1;
+                    _instance->deviceList[_instance->m_logicalAddressAllocated].m_powerStatus = PowerStatus(powerState.load());
+
+                    if ( powerState.load() != DEVICE_POWER_STATE_ON )
+                    {
+                       /*  reset the current active source when TV on going to standby */
+                        HdmiCecSinkImplementation::_instance->m_currentActiveSource = -1;
+                    }
+                    /* Initiate a ping straight away */
+                    HdmiCecSinkImplementation::_instance->m_pollNextState = POLL_THREAD_STATE_PING;
+                    HdmiCecSinkImplementation::_instance->m_ThreadExitCV.notify_one();
                 }
-                                        /* Initiate a ping straight away */
-                                        HdmiCecSinkImplementation::_instance->m_pollNextState = POLL_THREAD_STATE_PING;
-                                        HdmiCecSinkImplementation::_instance->m_ThreadExitCV.notify_one();
-            }
             }
             else
             {
@@ -1171,8 +1176,8 @@ namespace WPEFramework
             }
 
         if (msg.status.toInt() == SYSTEM_AUDIO_MODE_ON) {
-            LOGINFO("panel power state is %s", powerState ? "Off" : "On");
-            if (powerState == DEVICE_POWER_STATE_ON ) {
+            LOGINFO("panel power state is %s", powerState.load() ? "Off" : "On");
+            if (powerState.load() == DEVICE_POWER_STATE_ON ) {
                 LOGINFO("Notifying system audio mode ON event");
                 std::list<Exchange::IHdmiCecSink::INotification*>::const_iterator index(_hdmiCecSinkNotifications.begin());
                 while (index != _hdmiCecSinkNotifications.end()) {
@@ -1301,9 +1306,9 @@ namespace WPEFramework
         {
             JsonObject params;
             params["powerStatus"] = JsonValue(powerStatus);
-            LOGINFO("Panle power state is %s", powerState ? "Off" : "On");
+            LOGINFO("Panle power state is %s", powerState.load() ? "Off" : "On");
             if (powerStatus != AUDIO_DEVICE_POWERSTATE_OFF) {
-                if (powerState == DEVICE_POWER_STATE_ON ) {
+                if (powerState.load() == DEVICE_POWER_STATE_ON ) {
                         LOGINFO("Notify DS!!! logicalAddress = %d , Audio device power status = %d \n", logicalAddress, powerStatus);
                         std::list<Exchange::IHdmiCecSink::INotification*>::const_iterator index(_hdmiCecSinkNotifications.begin());
                         while (index != _hdmiCecSinkNotifications.end()) {
@@ -2764,74 +2769,75 @@ namespace WPEFramework
 
             while(1)
             {
-
-                   if (_instance->m_pollThreadExit || isExit ){
-                    LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d",_instance->m_pollThreadExit,isExit,_instance->m_pollThreadState,_instance->m_pollNextState );
-                    break;
-                }
-
-                if ( _instance->m_pollNextState != POLL_THREAD_STATE_NONE )
+                if(!(devicePowerState.load() == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                 {
-                    _instance->m_pollThreadState = _instance->m_pollNextState;
-                    _instance->m_pollNextState = POLL_THREAD_STATE_NONE;
-                }
+                    if (_instance->m_pollThreadExit || isExit ){
+                        LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d",_instance->m_pollThreadExit,isExit,_instance->m_pollThreadState,_instance->m_pollNextState );
+                        break;
+                    }
 
-                switch (_instance->m_pollThreadState)  {
-
-                case POLL_THREAD_STATE_POLL :
-                {
-                    //LOGINFO("POLL_THREAD_STATE_POLL");
-                    _instance->allocateLogicalAddress(DeviceType::TV);
-                    if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED)
+                    if ( _instance->m_pollNextState != POLL_THREAD_STATE_NONE )
                     {
-                        try{
-                            
-                            logicalAddress = LogicalAddress(_instance->m_logicalAddressAllocated);
-                            LibCCEC::getInstance().addLogicalAddress(logicalAddress);
-                            _instance->smConnection->setSource(logicalAddress);
-                            _instance->m_numberOfDevices = 0;
-                            _instance->deviceList[_instance->m_logicalAddressAllocated].m_deviceType = DeviceType::TV;
-                            _instance->deviceList[_instance->m_logicalAddressAllocated].m_isDevicePresent = true;
-                                        _instance->deviceList[_instance->m_logicalAddressAllocated].update(physical_addr);
-                            _instance->deviceList[_instance->m_logicalAddressAllocated].m_cecVersion = Version::V_1_4;
-                            _instance->deviceList[_instance->m_logicalAddressAllocated].m_vendorID = appVendorId;
-                            _instance->deviceList[_instance->m_logicalAddressAllocated].m_powerStatus = PowerStatus(powerState);
-                            _instance->deviceList[_instance->m_logicalAddressAllocated].m_osdName = osdName.toString().c_str();
-                            if(cecVersion == 2.0) {
-                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_cecVersion = Version::V_2_0;
-                                _instance->smConnection->sendTo(LogicalAddress(LogicalAddress::BROADCAST),
-                                                                    MessageEncoder().encode(ReportFeatures(Version::V_2_0,allDevicetype,rcProfile,deviceFeatures)), 500);
+                        _instance->m_pollThreadState = _instance->m_pollNextState;
+                        _instance->m_pollNextState = POLL_THREAD_STATE_NONE;
+                    }
+
+                    switch (_instance->m_pollThreadState)  {
+
+                    case POLL_THREAD_STATE_POLL :
+                    {
+                        //LOGINFO("POLL_THREAD_STATE_POLL");
+                        _instance->allocateLogicalAddress(DeviceType::TV);
+                        if ( _instance->m_logicalAddressAllocated != LogicalAddress::UNREGISTERED)
+                        {
+                            try{
+
+                                logicalAddress = LogicalAddress(_instance->m_logicalAddressAllocated);
+                                LibCCEC::getInstance().addLogicalAddress(logicalAddress);
+                                _instance->smConnection->setSource(logicalAddress);
+                                _instance->m_numberOfDevices = 0;
+                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_deviceType = DeviceType::TV;
+                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_isDevicePresent = true;
+                                            _instance->deviceList[_instance->m_logicalAddressAllocated].update(physical_addr);
+                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_cecVersion = Version::V_1_4;
+                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_vendorID = appVendorId;
+                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_powerStatus = PowerStatus(powerState.load());
+                                _instance->deviceList[_instance->m_logicalAddressAllocated].m_osdName = osdName.toString().c_str();
+                                if(cecVersion == 2.0) {
+                                    _instance->deviceList[_instance->m_logicalAddressAllocated].m_cecVersion = Version::V_2_0;
+                                    _instance->smConnection->sendTo(LogicalAddress(LogicalAddress::BROADCAST),
+                                                                        MessageEncoder().encode(ReportFeatures(Version::V_2_0,allDevicetype,rcProfile,deviceFeatures)), 500);
+                                }
+                                _instance->smConnection->addFrameListener(_instance->msgFrameListener);
+                                _instance->smConnection->sendTo(LogicalAddress(LogicalAddress::BROADCAST), 
+                                        MessageEncoder().encode(ReportPhysicalAddress(physical_addr, _instance->deviceList[_instance->m_logicalAddressAllocated].m_deviceType)), 100);
+
+                                _instance->m_sleepTime = 0;
+                                _instance->m_pollThreadState = POLL_THREAD_STATE_PING;
                             }
-                            _instance->smConnection->addFrameListener(_instance->msgFrameListener);
-                            _instance->smConnection->sendTo(LogicalAddress(LogicalAddress::BROADCAST), 
-                                    MessageEncoder().encode(ReportPhysicalAddress(physical_addr, _instance->deviceList[_instance->m_logicalAddressAllocated].m_deviceType)), 100);
-
-                            _instance->m_sleepTime = 0;
-                            _instance->m_pollThreadState = POLL_THREAD_STATE_PING;
+                            catch(InvalidStateException &e){
+                                LOGWARN("InvalidStateException caught while allocated logical address. %s", e.what());
+                                _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
+                            }
+                            catch(IOException &e){
+                                LOGWARN("IOException caught while allocated logical address. %s", e.what());
+                                _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
+                            }
+                            catch(...){
+                                LOGWARN("Exception caught while allocated logical address.");
+                                _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
+                            }
                         }
-                        catch(InvalidStateException &e){
-                            LOGWARN("InvalidStateException caught while allocated logical address. %s", e.what());
-                            _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
-                        }
-                        catch(IOException &e){
-                            LOGWARN("IOException caught while allocated logical address. %s", e.what());
-                            _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
-                        }
-                        catch(...){
-                            LOGWARN("Exception caught while allocated logical address.");
+                        else
+                        {
+                            LOGINFO("Not able allocate Logical Address for TV");    
                             _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
                         }
                     }
-                    else
+                    break;
+
+                    case POLL_THREAD_STATE_PING :
                     {
-                        LOGINFO("Not able allocate Logical Address for TV");    
-                        _instance->m_pollThreadState = POLL_THREAD_STATE_EXIT;
-                    }
-                }
-                break;
-
-                case POLL_THREAD_STATE_PING :
-                {
                     //LOGINFO("POLL_THREAD_STATE_PING");
                     _instance->m_pollThreadState = POLL_THREAD_STATE_INFO;
                     connected.clear();
@@ -2872,11 +2878,11 @@ namespace WPEFramework
                         _instance->m_pollThreadState = POLL_THREAD_STATE_UPDATE;
                         _instance->m_sleepTime = 0;
                     }
-                }
-                break;
+                    }
+                    break;
 
-                case POLL_THREAD_STATE_INFO :
-                {
+                    case POLL_THREAD_STATE_INFO :
+                    {
                     //LOGINFO("POLL_THREAD_STATE_INFO");
 
                     if ( logicalAddressRequested == LogicalAddress::UNREGISTERED + TEST_ADD )
@@ -2916,12 +2922,12 @@ namespace WPEFramework
                             _instance->m_sleepTime = HDMICECSINK_REQUEST_INTERVAL_TIME_MS;                            
                         }
                     }
-                }
-                break;
+                    }
+                    break;
 
-                /* updating the power status and if required we can add other information later*/
-                case POLL_THREAD_STATE_UPDATE :
-                {
+                    /* updating the power status and if required we can add other information later*/
+                    case POLL_THREAD_STATE_UPDATE :
+                    {
                     //LOGINFO("POLL_THREAD_STATE_UPDATE");
 
                     for(int i=0;i<LogicalAddress::UNREGISTERED + TEST_ADD;i++)
@@ -2943,19 +2949,19 @@ namespace WPEFramework
 
                     _instance->m_pollThreadState = POLL_THREAD_STATE_IDLE;        
                     _instance->m_sleepTime = 0;
-                }
-                break;
+                    }
+                    break;
 
-                case POLL_THREAD_STATE_IDLE :
-                {
+                    case POLL_THREAD_STATE_IDLE :
+                    {
                     //LOGINFO("POLL_THREAD_STATE_IDLE");
                     _instance->m_sleepTime = HDMICECSINK_PING_INTERVAL_MS;
                     _instance->m_pollThreadState = POLL_THREAD_STATE_PING;
-                }
-                break;
+                    }
+                    break;
 
-                case POLL_THREAD_STATE_WAIT :
-                {
+                    case POLL_THREAD_STATE_WAIT :
+                    {
                     /* Wait for Hdmi is connected, in case it disconnected */
                     //LOGINFO("19Aug2020-[01] -> POLL_THREAD_STATE_WAIT");
                     _instance->m_sleepTime = HDMICECSINK_WAIT_FOR_HDMI_IN_MS;
@@ -2964,24 +2970,31 @@ namespace WPEFramework
                     {
                         _instance->m_pollThreadState = POLL_THREAD_STATE_POLL;
                     }
-                }
-                break;
+                    }
+                    break;
 
-                case POLL_THREAD_STATE_EXIT :
-                {
+                    case POLL_THREAD_STATE_EXIT :
+                    {
                     isExit = true;
                     _instance->m_sleepTime = 0;
-                }
-                break;
-                }
+                    }
+                    break;
+                    }
 
-                /* coverity[BAD_CHECK_OF_WAIT_COND : FALSE] */
-                std::unique_lock<std::mutex> lk(_instance->m_pollExitMutex);
-                if ( _instance->m_ThreadExitCV.wait_for(lk, std::chrono::milliseconds(_instance->m_sleepTime)) == std::cv_status::timeout )
-                    continue;
-                else
-                    LOGINFO("Thread is going to Exit m_pollThreadExit %d\n", _instance->m_pollThreadExit );
-
+                    /* coverity[BAD_CHECK_OF_WAIT_COND : FALSE] */
+                    std::unique_lock<std::mutex> lk(_instance->m_pollExitMutex);
+                    if ( _instance->m_ThreadExitCV.wait_for(lk, std::chrono::milliseconds(_instance->m_sleepTime)) == std::cv_status::timeout )
+                        continue;
+                    else
+                        LOGINFO("Thread is going to Exit m_pollThreadExit %d\n", _instance->m_pollThreadExit );
+                }
+                else {
+                    if (_instance->m_pollThreadExit || isExit) {
+                        LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d", _instance->m_pollThreadExit, isExit, _instance->m_pollThreadState, _instance->m_pollNextState);
+                        break;
+                    }
+                    usleep(200000);
+                }
             }
         }
 
@@ -3362,8 +3375,8 @@ namespace WPEFramework
             {
                m_arcStartStopTimer.stop();
             }
-        if (powerState == DEVICE_POWER_STATE_ON ) {
-            LOGINFO("Notifying Arc Initiation event as power state is %s", powerState ? "Off" : "On");
+        if (powerState.load() == DEVICE_POWER_STATE_ON ) {
+            LOGINFO("Notifying Arc Initiation event as power state is %s", powerState.load() ? "Off" : "On");
             std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
             _instance->m_currentArcRoutingState = ARC_STATE_ARC_INITIATED;
 
@@ -3375,7 +3388,7 @@ namespace WPEFramework
                 index++;
         }
         } else {
-        LOGINFO("Not notifying Arc Initiation event as power state is %s", powerState ? "Off" : "On");
+        LOGINFO("Not notifying Arc Initiation event as power state is %s", powerState.load() ? "Off" : "On");
         }
 
        }
@@ -3446,82 +3459,89 @@ namespace WPEFramework
 
             while(!_instance->m_sendKeyEventThreadExit)
             {
-                int uikey = KEY_UNSUPPORTED;
-                keyInfo.logicalAddr = -1;
-                keyInfo.keyCode = -1;
+                if(!(devicePowerState.load() == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                 {
-                    // Wait for a message to be added to the queue
-                    std::unique_lock<std::mutex> lk(_instance->m_sendKeyEventMutex);
-                    _instance->m_sendKeyCV.wait(lk, []{return (_instance->m_sendKeyEventThreadRun == true);});
-                }
-
-                if (_instance->m_sendKeyEventThreadExit == true)
-                {
-                    LOGINFO(" threadSendKeyEvent Exiting");
-                    _instance->m_sendKeyEventThreadRun = false;
-                    break;
-                }
-
-                if (_instance->m_SendKeyQueue.empty()) {
-                    _instance->m_sendKeyEventThreadRun = false;
-                    continue;
-                }
-
-                keyInfo = _instance->m_SendKeyQueue.front();
-                _instance->m_SendKeyQueue.pop();
-
-                uikey = _instance->getUIKeyCode(keyInfo.keyCode);
-
-                if (uikey != KEY_UNSUPPORTED)
-                {
-                    if(keyInfo.UserControl == "sendUserControlPressed" )
+                    
+                    int uikey = KEY_UNSUPPORTED;
+                    keyInfo.logicalAddr = -1;
+                    keyInfo.keyCode = -1;
                     {
-                        LOGINFO("sendUserControlPressed : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
-                        _instance->sendUserControlPressed(keyInfo.logicalAddr,uikey);                        
+                        // Wait for a message to be added to the queue
+                        std::unique_lock<std::mutex> lk(_instance->m_sendKeyEventMutex);
+                        _instance->m_sendKeyCV.wait(lk, []{return (_instance->m_sendKeyEventThreadRun == true);});
                     }
-                    else if(keyInfo.UserControl == "sendUserControlReleased")
-                    {
-                        LOGINFO("sendUserControlReleased : logical addr:0x%x  queue size :%zu \n",keyInfo.logicalAddr,_instance->m_SendKeyQueue.size());
-                        _instance->sendUserControlReleased(keyInfo.logicalAddr);
-                    }
-                    else
-                    {
-                        LOGINFO("sendKeyPressEvent : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
-                        _instance->sendKeyPressEvent(keyInfo.logicalAddr,uikey);
-                        _instance->sendKeyReleaseEvent(keyInfo.logicalAddr);
-                    }
-                }
-                else
-                {
-                    LOGINFO("Unsupported Key code : 0x%x", keyInfo.keyCode);
-                }
 
-                if((_instance->m_SendKeyQueue.size()<=1 || (_instance->m_SendKeyQueue.size() % 2 == 0)) && ((keyInfo.keyCode == VOLUME_UP) || (keyInfo.keyCode == VOLUME_DOWN) || (keyInfo.keyCode == MUTE)) )
+                    if (_instance->m_sendKeyEventThreadExit == true)
                     {
-                        if(keyInfo.keyCode == MUTE)
-                    {
-                        _instance->sendGiveAudioStatusMsg();
+                        LOGINFO(" threadSendKeyEvent Exiting");
+                        _instance->m_sendKeyEventThreadRun = false;
+                        break;
                     }
-                    else
+
+                    if (_instance->m_SendKeyQueue.empty()) {
+                        _instance->m_sendKeyEventThreadRun = false;
+                        continue;
+                    }
+
+                    keyInfo = _instance->m_SendKeyQueue.front();
+                    _instance->m_SendKeyQueue.pop();
+
+                    uikey = _instance->getUIKeyCode(keyInfo.keyCode);
+
+                    if (uikey != KEY_UNSUPPORTED)
                     {
-                        LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ",_instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
-                        if (!_instance->m_isAudioStatusInfoUpdated)
+                        if(keyInfo.UserControl == "sendUserControlPressed" )
                         {
-                            if ( !(_instance->m_audioStatusDetectionTimer.isActive()))
-                            {
-                                LOGINFO("Audio status info not updated. Starting the Timer!");
-                                _instance->m_audioStatusTimerStarted = true;
-                                _instance->m_audioStatusDetectionTimer.start((HDMICECSINK_UPDATE_AUDIO_STATUS_INTERVAL_MS));
-                            }
-                            LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", _instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
+                            LOGINFO("sendUserControlPressed : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
+                            _instance->sendUserControlPressed(keyInfo.logicalAddr,uikey);                        
+                        }
+                        else if(keyInfo.UserControl == "sendUserControlReleased")
+                        {
+                            LOGINFO("sendUserControlReleased : logical addr:0x%x  queue size :%zu \n",keyInfo.logicalAddr,_instance->m_SendKeyQueue.size());
+                            _instance->sendUserControlReleased(keyInfo.logicalAddr);
                         }
                         else
                         {
-                            if (!_instance->m_audioStatusReceived){
-                                _instance->sendGiveAudioStatusMsg();
+                            LOGINFO("sendKeyPressEvent : logical addr:0x%x keyCode: 0x%x  queue size :%zu \n",keyInfo.logicalAddr,keyInfo.keyCode,_instance->m_SendKeyQueue.size());
+                            _instance->sendKeyPressEvent(keyInfo.logicalAddr,uikey);
+                            _instance->sendKeyReleaseEvent(keyInfo.logicalAddr);
+                        }
+                    }
+                    else
+                    {
+                        LOGINFO("Unsupported Key code : 0x%x", keyInfo.keyCode);
+                    }
+
+                    if((_instance->m_SendKeyQueue.size()<=1 || (_instance->m_SendKeyQueue.size() % 2 == 0)) && ((keyInfo.keyCode == VOLUME_UP) || (keyInfo.keyCode == VOLUME_DOWN) || (keyInfo.keyCode == MUTE)) )
+                        {
+                            if(keyInfo.keyCode == MUTE)
+                        {
+                            _instance->sendGiveAudioStatusMsg();
+                        }
+                        else
+                        {
+                            LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ",_instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
+                            if (!_instance->m_isAudioStatusInfoUpdated)
+                            {
+                                if ( !(_instance->m_audioStatusDetectionTimer.isActive()))
+                                {
+                                    LOGINFO("Audio status info not updated. Starting the Timer!");
+                                    _instance->m_audioStatusTimerStarted = true;
+                                    _instance->m_audioStatusDetectionTimer.start((HDMICECSINK_UPDATE_AUDIO_STATUS_INTERVAL_MS));
+                                }
+                                LOGINFO("m_isAudioStatusInfoUpdated :%d, m_audioStatusReceived :%d, m_audioStatusTimerStarted:%d ", _instance->m_isAudioStatusInfoUpdated,_instance->m_audioStatusReceived,_instance->m_audioStatusTimerStarted);
+                            }
+                            else
+                            {
+                                if (!_instance->m_audioStatusReceived){
+                                    _instance->sendGiveAudioStatusMsg();
+                                }
                             }
                         }
                     }
+                }
+                else{
+                    usleep(200000);
                 }
             }//while(!_instance->m_sendKeyEventThreadExit)
         }//threadSendKeyEvent
@@ -3538,73 +3558,79 @@ namespace WPEFramework
 
         void HdmiCecSinkImplementation::threadArcRouting()
         {
-        bool isExit = false;
-        uint32_t currentArcRoutingState;
+            bool isExit = false;
+            uint32_t currentArcRoutingState;
 
-        if(!HdmiCecSinkImplementation::_instance)
+            if(!HdmiCecSinkImplementation::_instance)
             {
-               return;
+                return;
             }
 
-        LOGINFO("Running threadArcRouting");
-        _instance->getHdmiArcPortID();
+            LOGINFO("Running threadArcRouting");
+            _instance->getHdmiArcPortID();
 
             while(1)
             {
-
-            _instance->m_semSignaltoArcRoutingThread.acquire();
-
-
-
-        { 
-                   LOGINFO(" threadArcRouting Got semaphore"); 
-            std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
-
-           currentArcRoutingState = _instance->m_currentArcRoutingState;
-
-           LOGINFO(" threadArcRouting  Got Sem arc state %d",currentArcRoutingState);
-        }       
-
-          switch (currentArcRoutingState) 
-          {   
-
-                 case ARC_STATE_REQUEST_ARC_INITIATION :
-                             { 
-
-                                 _instance->systemAudioModeRequest();
-                 _instance->Send_Request_Arc_Initiation_Message();
-
-                 }
-                      break;
-                case ARC_STATE_ARC_INITIATED :
+                if(devicePowerState.load() != WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
                 {
-                   _instance->Send_Report_Arc_Initiated_Message();
-                     }
-                 break;
-                case ARC_STATE_REQUEST_ARC_TERMINATION :
-                {
-
-                   _instance->Send_Request_Arc_Termination_Message();
-
+                    
+                    _instance->m_semSignaltoArcRoutingThread.acquire();
+                    
+                    { 
+                        LOGINFO(" threadArcRouting Got semaphore"); 
+                        std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
+                    
+                        currentArcRoutingState = _instance->m_currentArcRoutingState;
+                    
+                        LOGINFO(" threadArcRouting  Got Sem arc state %d",currentArcRoutingState);
+                    }       
+                
+                    switch (currentArcRoutingState) 
+                    {   
+                        case ARC_STATE_REQUEST_ARC_INITIATION :
+                        { 
+                            _instance->systemAudioModeRequest();
+                            _instance->Send_Request_Arc_Initiation_Message();           
+                        }
+                        break;
+                        case ARC_STATE_ARC_INITIATED :
+                        {
+                            _instance->Send_Report_Arc_Initiated_Message();
+                        }
+                        break;
+                        case ARC_STATE_REQUEST_ARC_TERMINATION :
+                        {
+                            _instance->Send_Request_Arc_Termination_Message();
+                        }
+                        break;
+                        case ARC_STATE_ARC_TERMINATED :
+                        {
+                            _instance->Send_Report_Arc_Terminated_Message();
+                        }
+                        break;
+                        case ARC_STATE_ARC_EXIT :
+                        {
+                            isExit = true;
+                        }
+                        break;
+                    }
+                
+                    if (isExit == true)
+                    {  
+                    LOGINFO(" threadArcRouting EXITing"); 
+                        break;
+                    }
+                }//if(devicePowerState.load() != WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
+                else {
+                    {
+                        std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
+                        if (_instance->m_currentArcRoutingState == ARC_STATE_ARC_EXIT) {
+                            LOGINFO(" threadArcRouting EXITing");
+                            break;
+                        }
+                    }
+                    usleep(200000); //200ms sleep
                 }
-                   break;
-                case ARC_STATE_ARC_TERMINATED :
-                {
-                  _instance->Send_Report_Arc_Terminated_Message();
-                }
-                   break;
-                case ARC_STATE_ARC_EXIT :
-                {
-                isExit = true;
-                }
-                break;
-             }
-
-             if (isExit == true)
-             {  
-             LOGINFO(" threadArcRouting EXITing"); 
-                 break;
-              }
             }//while(1)
         }//threadArcRouting
 

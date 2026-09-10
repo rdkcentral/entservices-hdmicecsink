@@ -1,0 +1,17 @@
+HdmiCec:
+  command: cec_message
+  description: Inject ReportPhysicalAddress - YAMAHA (LA=5, Audio System) at 2.0.0.0
+  message:
+    user_defined: true
+    # 0x5F  header: initiator 5 (YAMAHA, the audio system), destination 0xF (broadcast).
+    #       process(ReportPhysicalAddress) discards directed frames (cpp:351-353).
+    # 0x84  opcode <Report Physical Address>.
+    # 0x20, 0x00  physical address 2.0.0.0, the address Device_Config_Add_Network.yaml allocates to
+    #       this peer and the one process(InitiateArc) requires of an audio system whose address is
+    #       known (cpp:508-534, with getHDMIARCPortId stubbed to 1 throughout this project).
+    # 0x05  device type Audio System. Logical address 5 belongs to no other family
+    #       (Operands.hpp LogicalAddress::getType), and process(ReportPhysicalAddress) writes this
+    #       byte straight into deviceList[5].m_deviceType (cpp:367), which getDeviceList reports -
+    #       so declaring Playback Device here, as this document once did, put an impossible pair on
+    #       the bus and an impossible pair in the published device list.
+    payload: ["0x5F", "0x84", "0x20", "0x00", "0x05"]

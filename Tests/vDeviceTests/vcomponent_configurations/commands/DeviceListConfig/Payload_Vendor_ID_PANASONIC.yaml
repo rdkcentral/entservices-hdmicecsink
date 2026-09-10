@@ -1,0 +1,8 @@
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(DeviceVendorID) from PANASONIC (LA=8) - vendor 0x008045"
+  message:
+    user_defined: true
+    # Header 0x8F: initiator=8 (PANASONIC, Playback Device 2), destination=0xF (broadcast)
+    # Opcode 0x87: DeviceVendorID  Panasonic vendor ID 0x008045
+    payload: ["0x8F", "0x87", "0x00", "0x80", "0x45"]

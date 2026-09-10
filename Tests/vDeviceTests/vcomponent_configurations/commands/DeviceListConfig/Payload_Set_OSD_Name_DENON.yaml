@@ -1,0 +1,22 @@
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(SetOSDName) from DENON (LA=1, RecordingDevice, port 1 of the audio system) - OSD name 'DENON'"
+  message:
+    user_defined: true
+    # Header 0x10: initiator=1 (DENON, Recording Device 1), destination=0 (sink DUT, directed).
+    #       DENON IS ADDRESS 1, NOT 2.  The initiator nibble MUST equal the logical address
+    #       PEER_SEEDS assigns DENON, which ../Device_Config_Add_Network.yaml fixes at 1: DENON is
+    #       declared LAST among YAMAHA's children, so vcDevice_AllocatePhysicalLogicalAddresses
+    #       visits it FIRST and it takes RECORDINGDEVICE1, while LG is visited last and takes
+    #       RECORDINGDEVICE2 (RecordingDevice draws from the pool 1, 2, 9).  Writing 0x2_ here
+    #       registers LG's entry with DENON's name and leaves address 1 without one, so the wait
+    #       for DENON expires.  Init_Devicelist_Populate.verify_seed_payload_consistency() refuses
+    #       that before any frame is injected, and the sibling
+    #       Payload_Report_Physical_Address_DENON.yaml and Payload_Vendor_ID_DENON.yaml carry the
+    #       same 1 - the three move together or not at all.
+    #       DIRECTED, unlike this peer's ReportPhysicalAddress and DeviceVendorID payloads:
+    #       process(SetOSDName) discards broadcasts (HdmiCecSinkImplementation.cpp:307) exactly
+    #       where those two discard directed frames, so the three payloads for one peer are not
+    #       addressed alike.
+    # Opcode 0x47: SetOSDName  "DENON" = 0x44 0x45 0x4E 0x4F 0x4E
+    payload: ["0x10", "0x47", "0x44", "0x45", "0x4E", "0x4F", "0x4E"]

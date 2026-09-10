@@ -23,7 +23,6 @@
 #include "ccec/FrameListener.hpp"
 #include "ccec/Connection.hpp"
 
-#include "libIARM.h"
 #include "ccec/Assert.hpp"
 #include "ccec/Messages.hpp"
 #include "ccec/MessageDecoder.hpp"
@@ -43,7 +42,10 @@
 #include <interfaces/IUserSettings.h>
 #include "PowerManagerInterface.h"
 #include <interfaces/IHdmiCecSink.h>
-#include "host.hpp"
+/* COM-RPC DeviceSettings client helper and HDMI-In interface */
+#include "DeviceSettingsInterface.h"
+#include <interfaces/IDeviceSettingsHDMIIn.h>
+#include <boost/variant.hpp>
 
 using namespace WPEFramework;
 using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
@@ -482,7 +484,10 @@ private:
         // As the registration/unregistration of notifications is realized by the class PluginHost::JSONRPC,
         // this class exposes a public method called, Notify(), using this methods, all subscribed clients
         // will receive a JSONRPC message as a notification, in case this method is called.
-        class HdmiCecSinkImplementation : public Exchange::IHdmiCecSink, public device::Host::IHdmiInEvents {
+        class HdmiCecSinkImplementation
+            : public Exchange::IHdmiCecSink
+            , public DSHelper   // COM-RPC link to entservices-devicesettings
+        {
 
         enum {
             POLL_THREAD_STATE_NONE,
@@ -578,13 +583,35 @@ private:
             void onPowerModeChanged(const PowerState &currentState, const PowerState &newState);
             void registerEventHandlers();
 	    	void onPresentationLanguageChanged(const string& language);
-            void getHdmiArcPortID();
             int m_numberOfDevices; /* Number of connected devices othethan own device */
             bool m_audioDevicePowerStatusRequested;
 
             BEGIN_INTERFACE_MAP(HdmiCecSinkImplementation)
                 INTERFACE_ENTRY(Exchange::IHdmiCecSink)
             END_INTERFACE_MAP
+
+            using ParamsType = boost::variant<std::tuple<int, int>>;
+            enum Event { EV_HDMI_HOTPLUG };
+
+            class EXTERNAL DispatchJob : public Core::IDispatch {
+            protected:
+                DispatchJob(HdmiCecSinkImplementation* impl, Event event, ParamsType params)
+                    : _impl(impl), _event(event), _params(std::move(params))
+                { if (_impl != nullptr) _impl->AddRef(); }
+            public:
+                DispatchJob() = delete;
+                DispatchJob(const DispatchJob&) = delete;
+                DispatchJob& operator=(const DispatchJob&) = delete;
+                ~DispatchJob() { if (_impl != nullptr) _impl->Release(); }
+                static Core::ProxyType<Core::IDispatch> Create(HdmiCecSinkImplementation* impl, Event event, ParamsType params) {
+                    return Core::ProxyType<Core::IDispatch>(Core::ProxyType<DispatchJob>::Create(impl, event, std::move(params)));
+                }
+                void Dispatch() override { _impl->Dispatch(_event, _params); }
+            private:
+                HdmiCecSinkImplementation* _impl;
+                Event _event;
+                const ParamsType _params;
+            };
 
         private:
             class PowerManagerNotification : public Exchange::IPowerManager::IModeChangedNotification {
@@ -652,6 +679,7 @@ private:
         HdmiCecSinkImplementation& operator=(const HdmiCecSinkImplementation&) = delete;
         //Begin methods
         void InitializePowerManager(PluginHost::IShell *service);
+        void InitializeAfterDSReady();
         //End methods
         std::string logicalAddressDeviceType;
         bool cecSettingEnabled;
@@ -704,6 +732,30 @@ private:
         PowerManagerInterfaceRef _powerManagerPlugin;
         Core::Sink<PowerManagerNotification> _pwrMgrNotification;
         bool _registeredEventHandlers;
+        /** Delegate for IDeviceSettingsHDMIIn::INotification (hotplug events). */
+        class DSHDMIInNotification : public Exchange::IDeviceSettingsHDMIIn::INotification {
+            DSHDMIInNotification(const DSHDMIInNotification&) = delete;
+            DSHDMIInNotification& operator=(const DSHDMIInNotification&) = delete;
+        public:
+            explicit DSHDMIInNotification(HdmiCecSinkImplementation& p) : _parent(p) {}
+            ~DSHDMIInNotification() override = default;
+
+            void OnHDMIInEventHotPlug(const Exchange::IDeviceSettingsHDMIIn::HDMIInPort port,
+                                      const bool isConnected) override
+            {
+                _parent.dispatchEvent(EV_HDMI_HOTPLUG,
+                    std::make_tuple(static_cast<int>(port), static_cast<int>(isConnected)));
+            }
+
+            BEGIN_INTERFACE_MAP(DSHDMIInNotification)
+                INTERFACE_ENTRY(Exchange::IDeviceSettingsHDMIIn::INotification)
+            END_INTERFACE_MAP
+        private:
+            HdmiCecSinkImplementation& _parent;
+        };
+        Core::Sink<DSHDMIInNotification> _dsHdmiInNotification; // COM-RPC HDMI-In notification sink
+        PluginHost::IShell* _service;          /* stored in Configure(), used by InitializeAfterDSReady() */
+        bool _dsReadyInitialized;              /* guard: run InitializeAfterDSReady() only once */
         void allocateLogicalAddress(int deviceType);
         void allocateLAforTV();
         void pingDevices(std::vector<int> &connected , std::vector<int> &disconnected);
@@ -774,8 +826,14 @@ private:
         Core::hresult SetMenuLanguage(const string &language, HdmiCecSinkSuccess &successResult)  override;
         Core::hresult RequestAudioDevicePowerStatus(HdmiCecSinkSuccess &successResult) override;
 
-	 /*devicesetting APIs*/
-        virtual void OnHdmiInEventHotPlug(dsHdmiInPort_t port, bool isConnected) override;
+	 /*devicesetting COM-RPC callback: HDMI-In hotplug */
+        void dispatchEvent(Event ev, ParamsType params);
+        void Dispatch(Event ev, const ParamsType params);
+
+    protected:
+        /* DSHelper lifecycle callbacks */
+        void OnDeviceSettingsActivated() override;
+        void OnDeviceSettingsDeactivated() override;
 
     private:
         template <typename T>

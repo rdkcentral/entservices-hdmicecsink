@@ -38,8 +38,8 @@ The HDMI CEC Sink plugin is a WPEFramework (Thunder) plugin that implements HDMI
         ┌──────────────────────┼──────────────────────────┐
         │                      │                          │
 ┌───────▼──────┐    ┌─────────▼─────────┐    ┌──────────▼────────┐
-│  IARM Bus    │    │  Device Settings  │    │  CEC Hardware     │
-│  (IPC)       │    │  (DS HAL)         │    │  Driver (libCEC)  │
+│  IARM Bus    │    │  DeviceSettings   │    │  CEC Hardware     │
+│  (Power/Sys) │    │  Plugin (COM-RPC) │    │  Driver (libCEC)  │
 └──────────────┘    └───────────────────┘    └───────────────────┘
 ```
 
@@ -121,7 +121,7 @@ MessageEncoder → Connection → libCEC Driver → Hardware
 
 ```
 Audio Device InitiateArc → Processor → ARC Port Validation → 
-DS HAL (Audio Port Control) → Hardware Configuration → 
+DeviceSettings Plugin (COM-RPC) → Hardware Configuration → 
 Event Notification (arcInitiationEvent)
 ```
 
@@ -134,16 +134,17 @@ Event Notification (arcInitiationEvent)
    - JSONRPC communication framework
    - RPC for out-of-process execution
 
-2. **Device Settings (DS HAL)**
-   - HDMI port management
-   - Audio output control
-   - Display configuration
-   - Used for: Physical address retrieval, ARC port control
+2. **Device Settings Plugin (COM-RPC)**
+   - Accessed via COM-RPC through the DeviceSettings plugin
+   - HDMI port management and hotplug events
+   - Audio output control (ARC port management)
+   - Integration handled through DSHelper class
+   - Asynchronous initialization: plugin waits for DeviceSettings plugin activation
 
 3. **IARM Bus**
-   - Inter-process communication
    - Power state notifications
    - System event handling
+   - Note: Device Settings integration now uses COM-RPC instead of IARM
 
 4. **libCEC (Hardware Abstraction)**
    - CEC frame transmission/reception
@@ -152,7 +153,7 @@ Event Notification (arcInitiationEvent)
 
 ### Internal Utilities (helpers/)
 
-- **UtilsIarm.h**: IARM bus communication helpers
+- **DSHelper**: COM-RPC client for DeviceSettings plugin communication
 - **UtilsJsonRpc.h**: JSONRPC utility functions
 - **UtilsLogging.h**: Logging macros and functions
 - **UtilssyncPersistFile.h**: Persistent storage for settings
@@ -176,6 +177,26 @@ The plugin maintains persistent settings in `/opt/persistent/ds/cecData_2.json`:
 - Vendor ID
 - One-time programming (OTP) enabled flag
 
+## Initialization Flow
+
+The plugin uses an asynchronous initialization pattern for Device Settings integration:
+
+1. **Plugin Configure()**: Basic setup and persistent settings loaded
+2. **DSHelper::Open()**: Opens COM-RPC connection to DeviceSettings plugin
+3. **OnDeviceSettingsActivated()**: Callback invoked when DeviceSettings plugin becomes available
+   - Queries HDMI input count and port connection states
+   - Retrieves HDMI ARC port ID
+   - Registers for HDMI-In hotplug event notifications
+   - Populates hdmiInputs vector with port information
+4. **InitializeAfterDSReady()**: Completes remaining initialization (runs once)
+   - Starts worker threads (key event, ARC routing)
+   - Initializes timers
+   - Queries power state
+   - Enables CEC if configured
+   - Registers for UserSettings notifications
+
+This deferred initialization ensures the plugin operates correctly even if DeviceSettings is not immediately available at startup.
+
 ## Integration Points
 
 ### Power Management Integration
@@ -188,7 +209,7 @@ The plugin maintains persistent settings in `/opt/persistent/ds/cecData_2.json`:
 - Coordinates with user preferences for CEC behavior
 
 ### HDMI Input Integration
-- Monitors HDMI input port changes
+- Receives HDMI hotplug events via COM-RPC from DeviceSettings plugin
 - Triggers active source updates on port switching
 - Validates physical addresses against port topology
 

@@ -46,10 +46,10 @@ cd Thunder
 git checkout $THUNDER_COMMIT_SHA
 cd ..
 
-git clone --branch develop https://github.com/rdkcentral/entservices-apis.git
+git clone --branch feature/RDKEMW-6078_DSPlugin_Interface https://github.com/rdkcentral/entservices-apis.git
 
 cd ..
-git clone --branch develop https://github.com/rdkcentral/entservices-helpers.git
+git clone --branch topic/RDKEMW-20051_dsPlugin_helper https://github.com/rdkcentral/entservices-helpers.git
 cd "$GITHUB_WORKSPACE"
 
 git clone --branch 2.0.0 https://github.com/rdkcentral/entservices-testframework.git
@@ -106,6 +106,10 @@ cmake -G Ninja -S entservices-apis  -B build/entservices-apis \
     -DCMAKE_MODULE_PATH="$GITHUB_WORKSPACE/install/tools/cmake" \
 
 cmake --build build/entservices-apis --target install
+
+# entservices-apis does not install the DeviceSettings headers yet.
+mkdir -p "$GITHUB_WORKSPACE/install/usr/include/WPEFramework/interfaces"
+find "$GITHUB_WORKSPACE/entservices-apis/apis/DeviceSettings" -name "IDeviceSettings*.h" -exec cp {} "$GITHUB_WORKSPACE/install/usr/include/WPEFramework/interfaces/" \; 2>/dev/null || true
 
 ############################
 # generating minimal mock headers

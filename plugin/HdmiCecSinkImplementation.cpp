@@ -3692,16 +3692,6 @@ void HdmiCecSinkImplementation::InitializeAfterDSReady()
             LOGWARN("Exception while enabling CEC settings.\r\n");
         }
     }
-
-    /* Sync the TV's own deviceList power status with the state fetched above.
-     * m_logicalAddressAllocated is only valid after CECEnable(), and this entry
-     * is otherwise only updated on a subsequent OnPowerModeChanged transition,
-     * so without this a TV that boots straight into standby would be recorded
-     * as ON, causing CEC wakeup (Image/Text View On) to never be signalled. */
-    if (m_logicalAddressAllocated != LogicalAddress::UNREGISTERED) {
-        deviceList[m_logicalAddressAllocated].m_powerStatus = PowerStatus(powerState.load());
-    }
-
     getCecVersion();
 
     /* Register for UserSettings (presentation language). */

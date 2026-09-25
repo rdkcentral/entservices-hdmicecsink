@@ -652,7 +652,7 @@ TEST_F(HdmiCecSinkDsTest, setActiveSource_MissingParam)
 TEST_F(HdmiCecSinkDsTest, getActiveRoute)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getActiveRoute"), _T("{}"), response));
-    EXPECT_EQ(response, string("{\"available\":false,\"length\":0,\"ActiveRoute\":\"\",\"success\":true}"));
+    EXPECT_EQ(response, string("{\"available\":false,\"length\":0,\"pathList\":[],\"ActiveRoute\":\"\",\"success\":true}"));
 }
 
 TEST_F(HdmiCecSinkDsTest, requestActiveSource)

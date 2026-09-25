@@ -1,7 +1,7 @@
 -----------------
 Build:
 
-bitbake wpeframework-service-plugins
+bitbake thunder-service-plugins
 
 -----------------
 Test:

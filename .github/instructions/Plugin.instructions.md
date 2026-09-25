@@ -55,7 +55,7 @@ For better readability, it is always good to define the following plugin metadat
 ### Example
 
 ```cpp
-namespace WPEFramework {
+namespace Thunder {
     namespace {
         static Plugin::Metadata<Plugin::HdcpProfile> metadata(
             API_VERSION_NUMBER_MAJOR,

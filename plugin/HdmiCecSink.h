@@ -25,7 +25,7 @@
 
 #include <thread>
 
-#undef Assert // this define from Connection.hpp conflicts with WPEFramework
+#undef Assert // this define from Connection.hpp conflicts with Thunder
 
 #include "Module.h"
 
@@ -36,9 +36,9 @@
 #include <interfaces/json/JHdmiCecSink.h>
 #include <interfaces/json/JsonData_HdmiCecSink.h>
 
-using namespace WPEFramework;
+using namespace Thunder;
 
-namespace WPEFramework {
+namespace Thunder {
 
     namespace Plugin {
 		// This is a server for a JSONRPC communication channel. 
@@ -277,4 +277,4 @@ namespace WPEFramework {
                 uint32_t _connectionId;
         };
 	} // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

@@ -202,7 +202,7 @@ Settings stored in `/opt/persistent/ds/cecData_2.json`:
 - Generic RDK-V (Video) deployments
 
 **Build Integration**
-- BitBake recipe: `wpeframework-service-plugins`
+- BitBake recipe: `thunder-service-plugins`
 - CMake-based build system
 - Modular plugin architecture for easy updates
 - L1 and L2 test framework integration

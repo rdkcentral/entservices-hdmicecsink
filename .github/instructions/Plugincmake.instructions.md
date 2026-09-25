@@ -6,7 +6,7 @@ applyTo: "**/CMakeLists.txt"
 
 ### Requirement
 
-All CMake targets, install paths, export sets, `find_package` and references must use the ${NAMESPACE} variable instead of hardcoded framework names (e.g., WPEFrameworkCore, WPEFrameworkPlugins).
+All CMake targets, install paths, export sets, `find_package` and references must use the ${NAMESPACE} variable instead of hardcoded framework names (e.g., ThunderCore, ThunderPlugins).
 
 ### Correct Example
 
@@ -28,16 +28,16 @@ target_link_libraries(${MODULE_NAME}
 ### Incorrect Example
 
 ```cmake
-set(MODULE_NAME WPEFramework${PLUGIN_NAME})
+set(MODULE_NAME Thunder${PLUGIN_NAME})
 
-find_package(WPEFrameworkPlugins REQUIRED)
+find_package(ThunderPlugins REQUIRED)
 
-find_package(WPEFrameworkDefinitions REQUIRED)
+find_package(ThunderDefinitions REQUIRED)
 
 target_link_libraries(${MODULE_NAME} 
     PRIVATE
     CompileSettingsDebug::CompileSettingsDebug
-    WPEFrameworkPlugins::WPEFrameworkPlugins
-    WPEFrameworkDefinitions::WPEFrameworkDefinitions)
+    ThunderPlugins::ThunderPlugins
+    ThunderDefinitions::ThunderDefinitions)
 ```
 

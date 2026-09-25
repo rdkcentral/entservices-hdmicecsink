@@ -35,14 +35,14 @@
     fflush(stderr);
 
 using ::testing::NiceMock;
-using namespace WPEFramework;
+using namespace Thunder;
 using testing::StrictMock;
-using HdmiCecSinkSuccess = WPEFramework::Exchange::IHdmiCecSink::HdmiCecSinkSuccess;
-using HdmiCecSinkDevice = WPEFramework::Exchange::IHdmiCecSink::HdmiCecSinkDevices;
-using HdmiCecSinkActivePath = WPEFramework::Exchange::IHdmiCecSink::HdmiCecSinkActivePath;
-using IHdmiCecSinkDeviceListIterator = WPEFramework::Exchange::IHdmiCecSink::IHdmiCecSinkDeviceListIterator;
-using IHdmiCecSinkActivePathIterator = WPEFramework::Exchange::IHdmiCecSink::IHdmiCecSinkActivePathIterator;
-using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
+using HdmiCecSinkSuccess = Thunder::Exchange::IHdmiCecSink::HdmiCecSinkSuccess;
+using HdmiCecSinkDevice = Thunder::Exchange::IHdmiCecSink::HdmiCecSinkDevices;
+using HdmiCecSinkActivePath = Thunder::Exchange::IHdmiCecSink::HdmiCecSinkActivePath;
+using IHdmiCecSinkDeviceListIterator = Thunder::Exchange::IHdmiCecSink::IHdmiCecSinkDeviceListIterator;
+using IHdmiCecSinkActivePathIterator = Thunder::Exchange::IHdmiCecSink::IHdmiCecSinkActivePathIterator;
+using PowerState = Thunder::Exchange::IPowerManager::PowerState;
 
 namespace {
 static void removeFile(const char* fileName)

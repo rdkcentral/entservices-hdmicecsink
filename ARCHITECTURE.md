@@ -2,7 +2,7 @@
 
 ## Overview
 
-The HDMI CEC Sink plugin is a WPEFramework (Thunder) plugin that implements HDMI Consumer Electronics Control (CEC) protocol for TV/display devices. It enables the device to act as a CEC sink, allowing it to receive and respond to CEC commands from connected source devices like set-top boxes, media players, and gaming consoles.
+The HDMI CEC Sink plugin is a Thunder plugin that implements HDMI Consumer Electronics Control (CEC) protocol for TV/display devices. It enables the device to act as a CEC sink, allowing it to receive and respond to CEC commands from connected source devices like set-top boxes, media players, and gaming consoles.
 
 ## System Architecture
 
@@ -10,7 +10,7 @@ The HDMI CEC Sink plugin is a WPEFramework (Thunder) plugin that implements HDMI
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    WPEFramework Core                         │
+│                    Thunder Core                             │
 └────────────────────┬────────────────────────────────────────┘
                      │
         ┌────────────┴────────────┐
@@ -23,13 +23,13 @@ The HDMI CEC Sink plugin is a WPEFramework (Thunder) plugin that implements HDMI
         │ RPC Communication
         │
 ┌───────▼─────────────────────────────────────────────────────┐
-│         HdmiCecSinkImplementation (Out-of-Process)           │
-├──────────────────────────────────────────────────────────────┤
+│         HdmiCecSinkImplementation (Out-of-Process)          │
+├─────────────────────────────────────────────────────────────┤
 │  ┌────────────────┐  ┌──────────────────┐  ┌─────────────┐  │
 │  │ CEC Message    │  │ Device Manager   │  │ ARC Handler │  │
 │  │ Processor      │  │                  │  │             │  │
 │  └───────┬────────┘  └────────┬─────────┘  └──────┬──────┘  │
-│          │                    │                   │          │
+│          │                    │                   │         │
 │  ┌───────▼────────────────────▼───────────────────▼──────┐  │
 │  │         CEC Connection & Frame Listener               │  │
 │  └───────────────────────────┬───────────────────────────┘  │
@@ -47,7 +47,7 @@ The HDMI CEC Sink plugin is a WPEFramework (Thunder) plugin that implements HDMI
 
 ### 1. Plugin Shell (HdmiCecSink)
 
-- **Purpose**: Provides the WPEFramework plugin interface and JSONRPC communication endpoint
+- **Purpose**: Provides the Thunder plugin interface and JSONRPC communication endpoint
 - **Key Responsibilities**:
   - Plugin lifecycle management (Initialize/Deinitialize)
   - JSONRPC method registration and dispatching
@@ -129,7 +129,7 @@ Event Notification (arcInitiationEvent)
 
 ### External Dependencies
 
-1. **WPEFramework Core**
+1. **Thunder Core**
    - Plugin infrastructure and lifecycle
    - JSONRPC communication framework
    - RPC for out-of-process execution

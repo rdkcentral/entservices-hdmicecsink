@@ -29,7 +29,7 @@
 #include "ccec/MessageDecoder.hpp"
 #include "ccec/MessageProcessor.hpp"
 
-#undef Assert // this define from Connection.hpp conflicts with WPEFramework
+#undef Assert // this define from Connection.hpp conflicts with Thunder
 
 #include "Module.h"
 #include "tptimer.h"
@@ -45,12 +45,12 @@
 #include <interfaces/IHdmiCecSink.h>
 #include "host.hpp"
 
-using namespace WPEFramework;
-using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
-using ThermalTemperature = WPEFramework::Exchange::IPowerManager::ThermalTemperature;
+using namespace Thunder;
+using PowerState = Thunder::Exchange::IPowerManager::PowerState;
+using ThermalTemperature = Thunder::Exchange::IPowerManager::ThermalTemperature;
 
 
-namespace WPEFramework {
+namespace Thunder {
 
     namespace Plugin {
         class HdmiCecSinkFrameListener : public FrameListener
@@ -788,4 +788,4 @@ private:
         mutable Core::CriticalSection _adminLock;
         };
     } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

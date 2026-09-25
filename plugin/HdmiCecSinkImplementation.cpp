@@ -105,7 +105,7 @@ static float cecVersion = 1.4;
 static AllDeviceTypes allDevicetype = ALL_DEVICE_TYPES;
 static std::vector<RcProfile> rcProfile = {RC_PROFILE_TV};
 static std::vector<DeviceFeatures> deviceFeatures = {DEVICE_FEATURES_TV};
-static std::atomic<WPEFramework::Exchange::IPowerManager::PowerState> devicePowerState{WPEFramework::Exchange::IPowerManager::POWER_STATE_ON};
+static std::atomic<Thunder::Exchange::IPowerManager::PowerState> devicePowerState{Thunder::Exchange::IPowerManager::POWER_STATE_ON};
 
 
 #define KEY_UNSUPPORTED 0xFF
@@ -114,9 +114,9 @@ static std::atomic<WPEFramework::Exchange::IPowerManager::PowerState> devicePowe
 #define API_VERSION_NUMBER_MINOR 3
 #define API_VERSION_NUMBER_PATCH 7
 
-using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
+using PowerState = Thunder::Exchange::IPowerManager::PowerState;
 
-namespace WPEFramework
+namespace Thunder
 {
 
     namespace Plugin
@@ -801,15 +801,15 @@ namespace WPEFramework
 
             // get power state:
             uint32_t res = Core::ERROR_GENERAL;
-            PowerState pwrStateCur = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
-            PowerState pwrStatePrev = WPEFramework::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+            PowerState pwrStateCur = Thunder::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
+            PowerState pwrStatePrev = Thunder::Exchange::IPowerManager::POWER_STATE_UNKNOWN;
 
             ASSERT (_powerManagerPlugin);
             if (_powerManagerPlugin) {
                 res = _powerManagerPlugin->GetPowerState(pwrStateCur, pwrStatePrev);
                 if (Core::ERROR_NONE == res) {
                     devicePowerState.store(pwrStateCur);
-                    powerState.store((pwrStateCur == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON) ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF);
+                    powerState.store((pwrStateCur == Thunder::Exchange::IPowerManager::POWER_STATE_ON) ? DEVICE_POWER_STATE_ON : DEVICE_POWER_STATE_OFF);
                     LOGINFO("Current state is PowerManagerPlugin: (%d) powerState :%d \n", pwrStateCur, powerState.load());
                 }
             }
@@ -968,7 +968,7 @@ namespace WPEFramework
                     currentState, newState);
             LOGWARN(" m_logicalAddressAllocated 0x%x CEC enable status %d \n",_instance->m_logicalAddressAllocated,_instance->cecEnableStatus);
             devicePowerState.store(newState);
-            if(newState == WPEFramework::Exchange::IPowerManager::POWER_STATE_ON)
+            if(newState == Thunder::Exchange::IPowerManager::POWER_STATE_ON)
             {
                 powerState.store(DEVICE_POWER_STATE_ON); 
             }
@@ -2769,7 +2769,7 @@ namespace WPEFramework
 
             while(1)
             {
-                if(!(devicePowerState.load() == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
+                if(!(devicePowerState.load() == Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                 {
                     if (_instance->m_pollThreadExit || isExit ){
                         LOGWARN("Thread Exits _instance->m_pollThreadExit %d isExit %d _instance->m_pollThreadState %d  _instance->m_pollNextState %d",_instance->m_pollThreadExit,isExit,_instance->m_pollThreadState,_instance->m_pollNextState );
@@ -3459,7 +3459,7 @@ namespace WPEFramework
 
             while(!_instance->m_sendKeyEventThreadExit)
             {
-                if(!(devicePowerState.load() == WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
+                if(!(devicePowerState.load() == Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP))
                 {
                     
                     int uikey = KEY_UNSUPPORTED;
@@ -3571,7 +3571,7 @@ namespace WPEFramework
 
             while(1)
             {
-                if(devicePowerState.load() != WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
+                if(devicePowerState.load() != Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
                 {
                     
                     _instance->m_semSignaltoArcRoutingThread.acquire();
@@ -3620,7 +3620,7 @@ namespace WPEFramework
                     LOGINFO(" threadArcRouting EXITing"); 
                         break;
                     }
-                }//if(devicePowerState.load() != WPEFramework::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
+                }//if(devicePowerState.load() != Thunder::Exchange::IPowerManager::POWER_STATE_STANDBY_DEEP_SLEEP)
                 else {
                     {
                         std::lock_guard<std::mutex> lock(_instance->m_arcRoutingStateMutex);
@@ -3719,4 +3719,4 @@ namespace WPEFramework
               }
        }
     } // namespace Plugin
-} // namespace WPEFramework
+} // namespace Thunder

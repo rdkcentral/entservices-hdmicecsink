@@ -45,7 +45,7 @@
 #include "HdmiInputMock.h"
 #include "TelemetryMock.h"
 
-using namespace WPEFramework;
+using namespace Thunder;
 using ::testing::NiceMock;
 
 namespace

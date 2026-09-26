@@ -12,7 +12,7 @@ env:
   BUILD_TYPE: Debug
   THUNDER_TOOLS_COMMIT_SHA: "d5dd83c7c19c49c7f25c558c126500bd2d64f7a4"
   THUNDER_COMMIT_SHA: "2c0fcc5529e7da734be558ca6efa05d934dcce31"
-  INTERFACES_REF: "develop"
+  INTERFACES_REF: "feature/RDKEMW-6078_DSPlugin_Interface"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
 
@@ -187,6 +187,11 @@ jobs:
           cmake --build build/entservices-apis -j8
           &&
           cmake --install build/entservices-apis
+
+      - name: Copy DeviceSettings interface headers
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/install/usr/include/WPEFramework/interfaces"
+          find "$GITHUB_WORKSPACE/entservices-apis/apis/DeviceSettings" -name "IDeviceSettings*.h" -exec cp {} "$GITHUB_WORKSPACE/install/usr/include/WPEFramework/interfaces/" \; 2>/dev/null || true
 
       - name: Generate external headers
         # Empty headers to mute errors
@@ -364,7 +369,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-helpers
           path: entservices-helpers
-          ref: develop
+          ref: topic/RDKEMW-20051_dsPlugin_helper
 
       - name: Build entservices-helpers
         run: >

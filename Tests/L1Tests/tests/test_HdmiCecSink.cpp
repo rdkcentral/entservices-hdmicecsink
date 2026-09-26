@@ -514,7 +514,11 @@ TEST_F(HdmiCecSinkInitializedEventDsTest, onHdmiOutputHDCPStatusEvent)
 {
 
     EVENT_SUBSCRIBE(0, _T("onDevicesChanged"), _T("client.events.onDevicesChanged"), message);
-    Plugin::HdmiCecSinkImplementation::_instance->OnHdmiInEventHotPlug(dsHDMI_IN_PORT_1, true);
+    Plugin::HdmiCecSinkImplementation::_instance->dispatchEvent(
+        Plugin::HdmiCecSinkImplementation::EV_HDMI_HOTPLUG,
+        std::make_tuple(
+            static_cast<int>(Exchange::IDeviceSettingsHDMIIn::DS_HDMI_IN_PORT_1),
+            static_cast<int>(true)));
     EVENT_UNSUBSCRIBE(0, _T("onDevicesChanged"), _T("client.events.onDevicesChanged"), message);
 
 }

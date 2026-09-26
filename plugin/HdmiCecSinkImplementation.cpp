@@ -826,11 +826,54 @@ namespace WPEFramework
 
        void HdmiCecSinkImplementation::Dispatch(Event ev, const ParamsType params)
        {
-           if (!HdmiCecSinkImplementation::_instance) return;
-           if (ev == EV_HDMI_HOTPLUG) {
-               auto t = boost::get<std::tuple<int, int>>(params);
-               HdmiCecSinkImplementation::_instance->onHdmiHotPlug(std::get<0>(t), std::get<1>(t));
-           }
+        if (!HdmiCecSinkImplementation::_instance) return;
+        if (ev == EV_HDMI_HOTPLUG) {
+            auto t = boost::get<std::tuple<int, int>>(params);
+            HdmiCecSinkImplementation::_instance->onHdmiHotPlug(std::get<0>(t), std::get<1>(t));
+        }
+        else if (ev == EV_DS_ACTIVATED_INIT) {
+            auto* hdmiIn = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
+            if (hdmiIn) {
+                /* Get the real input count now that DS is available. */
+                int32_t count = 0;
+                if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE) {
+                    m_numofHdmiInput = static_cast<int>(count);
+                    hdmiInputs.clear();
+                    for (int i = 0; i < m_numofHdmiInput; i++) {
+                        hdmiInputs.emplace_back(static_cast<uint8_t>(i));
+                    }
+                    /* Query live port-connection states — hdmiInputs is fully built here,
+                    * exactly as DS_IARM does with CheckHdmiInState() in Configure()
+                    * after device::Manager::Initialize(). */
+                    CheckHdmiInState();
+                } else {
+                    LOGWARN("HdmiCecSink OnActivated: GetHDMIInNumberOfInputs failed");
+                }
+                hdmiIn->Release();
+            } else {
+                LOGWARN("HdmiCecSink OnActivated: IDeviceSettingsHDMIIn unavailable");
+            }
+
+            auto* audio = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsAudio>();
+            if (audio) {
+                int32_t arcPortID = -1;
+                int32_t audioHandle = -1;
+
+                if (audio->GetAudioHDMIARCPortId(audioHandle, arcPortID) == Core::ERROR_NONE) {
+                    HdmiArcPortID = arcPortID;
+                }
+                audio->Release();
+            }
+            else {
+                LOGERR("Failed to get Audio handle");
+            }
+            LOGINFO("HdmiCecSink OnActivated: m_numofHdmiInput=%d HdmiArcPortID=%d",m_numofHdmiInput, HdmiArcPortID);
+
+            /* Now that hdmiInputs is populated, complete the rest of the initialization
+            * (threads, CEC enable, UserSettings).  Guarded so a DS plugin restart
+            * refreshes hdmiInputs/HdmiArcPortID but does not restart threads. */
+            InitializeAfterDSReady();
+        }
        }
 
        void HdmiCecSinkImplementation::onPresentationLanguageChanged(const string& presentationLanguage)
@@ -3728,43 +3771,12 @@ void HdmiCecSinkImplementation::OnDeviceSettingsActivated()
     if (hdmiIn) {
         /* Register for HDMI-In hotplug events. */
         hdmiIn->Register("HdmiCecSink", &_dsHdmiInNotification);
-        /* Get the real input count now that DS is available. */
-        int32_t count = 0;
-        if (hdmiIn->GetHDMIInNumberOfInputs(count) == Core::ERROR_NONE) {
-            m_numofHdmiInput = static_cast<int>(count);
-            hdmiInputs.clear();
-            for (int i = 0; i < m_numofHdmiInput; i++) {
-                hdmiInputs.emplace_back(static_cast<uint8_t>(i));
-            }
-            /* Query live port-connection states — hdmiInputs is fully built here,
-             * exactly as DS_IARM does with CheckHdmiInState() in Configure()
-             * after device::Manager::Initialize(). */
-            CheckHdmiInState();
-
-            auto* audio = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsAudio>();
-            if (audio) {
-                int32_t arcPortID = -1;
-                int32_t audioHandle = -1;
-
-                if (audio->GetAudioHDMIARCPortId(audioHandle, arcPortID) == Core::ERROR_NONE) {
-                    HdmiArcPortID = arcPortID;
-                }
-                audio->Release();
-            }
-            LOGINFO("HdmiCecSink OnActivated: m_numofHdmiInput=%d HdmiArcPortID=%d",
-                    m_numofHdmiInput, HdmiArcPortID);
-        } else {
-            LOGWARN("HdmiCecSink OnActivated: GetHDMIInNumberOfInputs failed");
-        }
         hdmiIn->Release();
     } else {
         LOGWARN("HdmiCecSink OnActivated: IDeviceSettingsHDMIIn unavailable");
     }
 
-    /* Now that hdmiInputs is populated, complete the rest of the initialization
-     * (threads, CEC enable, UserSettings).  Guarded so a DS plugin restart
-     * refreshes hdmiInputs/HdmiArcPortID but does not restart threads. */
-    InitializeAfterDSReady();
+    dispatchEvent(EV_DS_ACTIVATED_INIT, ParamsType());
 }
 
 void HdmiCecSinkImplementation::OnDeviceSettingsDeactivated()

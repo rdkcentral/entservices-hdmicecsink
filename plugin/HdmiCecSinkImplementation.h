@@ -591,7 +591,10 @@ private:
             END_INTERFACE_MAP
 
             using ParamsType = boost::variant<std::tuple<int, int>>;
-            enum Event { EV_HDMI_HOTPLUG };
+            enum Event { 
+                EV_HDMI_HOTPLUG,
+                EV_DS_ACTIVATED_INIT,
+            };
 
             class EXTERNAL DispatchJob : public Core::IDispatch {
             protected:

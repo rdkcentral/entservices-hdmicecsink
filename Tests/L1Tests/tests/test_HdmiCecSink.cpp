@@ -31,7 +31,6 @@
 #include "FactoriesImplementation.h"
 #include "IarmBusMock.h"
 #include "ServiceMock.h"
-#include "devicesettings.h"
 #include "HdmiCec.h"
 #include "HdmiCecMock.h"
 #include "WrapsMock.h"
@@ -40,9 +39,6 @@
 #include "PowerManagerMock.h"
 #include "WorkerPoolImplementation.h"
 #include "COMLinkMock.h"
-#include "ManagerMock.h"
-#include "HostMock.h"
-#include "HdmiInputMock.h"
 #include "TelemetryMock.h"
 
 using namespace WPEFramework;
@@ -109,9 +105,6 @@ protected:
 class HdmiCecSinkDsTest : public HdmiCecSinkInitializeTest {
 protected:
     IarmBusImplMock         *p_iarmBusImplMock = nullptr ;
-    ManagerImplMock         *p_managerImplMock = nullptr ;
-    HostImplMock            *p_hostImplMock = nullptr ;
-    HdmiInputImplMock       *p_hdmiInputImplMock = nullptr;
     ConnectionImplMock      *p_connectionImplMock = nullptr ;
     MessageEncoderMock      *p_messageEncoderMock = nullptr ;
     LibCCECImplMock         *p_libCCECImplMock = nullptr ;
@@ -128,15 +121,6 @@ protected:
         createFile("/etc/device.properties", "RDK_PROFILE=TV");
         p_iarmBusImplMock  = new NiceMock <IarmBusImplMock>;
         IarmBus::setImpl(p_iarmBusImplMock);
-
-        p_managerImplMock  = new NiceMock <ManagerImplMock>;
-        device::Manager::setImpl(p_managerImplMock);
-
-        p_hostImplMock      = new NiceMock <HostImplMock>;
-        device::Host::setImpl(p_hostImplMock);
-
-        p_hdmiInputImplMock  = new NiceMock <HdmiInputImplMock>;
-        device::HdmiInput::setImpl(p_hdmiInputImplMock);
 
         p_libCCECImplMock  = new testing::NiceMock <LibCCECImplMock>;
         LibCCEC::setImpl(p_libCCECImplMock);
@@ -174,28 +158,8 @@ protected:
         ON_CALL(*p_messageEncoderMock, encode(::testing::Matcher<const UserControlPressed&>(::testing::_)))
            .WillByDefault(::testing::ReturnRef(CECFrame::getInstance()));
 
-        EXPECT_CALL(*p_managerImplMock, Initialize())
-            .Times(::testing::AnyNumber())
-            .WillRepeatedly(::testing::Return());
-
         ON_CALL(*p_connectionImplMock, open())
             .WillByDefault(::testing::Return());
-
-        EXPECT_CALL(*p_hdmiInputImplMock, getNumberOfInputs())
-            .WillRepeatedly(::testing::Return(3));
-
-        ON_CALL(*p_hdmiInputImplMock, isPortConnected(::testing::_))
-            .WillByDefault(::testing::Invoke(
-                [](int8_t port) {
-                    return port == 1? true : false;
-                }));
-
-        ON_CALL(*p_hdmiInputImplMock, getHDMIARCPortId(::testing::_))
-            .WillByDefault(::testing::Invoke(
-                [](int &portId) {
-                    portId = 1;
-                    return dsERR_NONE;
-                }));
 
         ON_CALL(*p_connectionImplMock, addFrameListener(::testing::_))
         .WillByDefault([this](FrameListener* listener) {
@@ -238,24 +202,6 @@ protected:
         {
             delete p_iarmBusImplMock;
             p_iarmBusImplMock = nullptr;
-        }
-        device::Manager::setImpl(nullptr);
-        if (p_managerImplMock != nullptr)
-        {
-            delete p_managerImplMock;
-            p_managerImplMock = nullptr;
-        }
-        device::Host::setImpl(nullptr);
-        if (p_hostImplMock != nullptr)
-        {
-            delete p_hostImplMock;
-            p_hostImplMock = nullptr;
-        }
-        device::HdmiInput::setImpl(nullptr);
-        if (p_hdmiInputImplMock != nullptr)
-        {
-            delete p_hdmiInputImplMock;
-            p_hdmiInputImplMock = nullptr;
         }
         LibCCEC::setImpl(nullptr);
         if (p_libCCECImplMock != nullptr)

@@ -340,7 +340,7 @@ protected:
     Exchange::IHdmiCecSink* m_cecSinkPlugin = nullptr;
     PluginHost::IShell* m_controller_cecSink = nullptr;
     Core::Sink<HdmiCecSinkNotificationHandler> m_notificationHandler;
-    IARM_EventHandler_t dsHdmiEventHandler;
+    dsHdmiInConnectCB_t m_dsHdmiInConnectCB = nullptr;
     IARM_EventHandler_t powerEventHandler = nullptr;
     FrameListener* registeredListener = nullptr;
     std::vector<FrameListener*> listeners;
@@ -444,14 +444,11 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     ON_CALL(*p_messageEncoderMock, encode(::testing::Matcher<const UserControlPressed&>(::testing::_)))
         .WillByDefault(::testing::ReturnRef(CECFrame::getInstance()));
 
-    ON_CALL(*p_iarmBusImplMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInRegisterConnectCB(::testing::_))
         .WillByDefault(::testing::Invoke(
-            [&](const char* ownerName, IARM_EventId_t eventId, IARM_EventHandler_t handler) {
-                if ((string(IARM_BUS_DSMGR_NAME) == string(ownerName)) && (eventId == IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG)) {
-                    EXPECT_TRUE(handler != nullptr);
-                    dsHdmiEventHandler = handler;
-                }
-                return IARM_RESULT_SUCCESS;
+            [&](dsHdmiInConnectCB_t cbFunc) {
+                m_dsHdmiInConnectCB = cbFunc;
+                return dsERR_NONE;
             }));
 
     ON_CALL(*p_connectionMock, addFrameListener(::testing::_))
@@ -463,25 +460,25 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     ON_CALL(*p_connectionMock, open())
         .WillByDefault(::testing::Return());
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getNumberOfInputs())
-        .WillRepeatedly(::testing::Return(3));
-
-    ON_CALL(*p_hdmiInputImplMock, isPortConnected(::testing::_))
-        .WillByDefault(::testing::Invoke(
-            [](int8_t port) {
-                return port == 1 ? true : false;
+    EXPECT_CALL(*p_dsHdmiInHalMock, dsHdmiInGetNumberOfInputs(::testing::_))
+        .WillRepeatedly(::testing::Invoke(
+            [](uint8_t* pNumberOfinputs) {
+                *pNumberOfinputs = 3;
+                return dsERR_NONE;
             }));
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getHDMIARCPortId(::testing::_))
-        .Times(::testing::AtLeast(1))
-        .WillRepeatedly(::testing::Invoke(
-            [](int& portId) -> dsError_t {
-                fprintf(stderr, "[TEST MOCK] getHDMIARCPortId called (expectation)\n");
-                portId = 1;
-                return static_cast<dsError_t>(0);
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInGetStatus(::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](dsHdmiInStatus_t* pStatus) {
+                memset(pStatus, 0, sizeof(dsHdmiInStatus_t));
+                pStatus->isPortConnected[dsHDMI_IN_PORT_1] = true;
+                return dsERR_NONE;
             }));
 
     /* Activate plugin in constructor */
+    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
     status = ActivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
@@ -518,6 +515,9 @@ HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
     status = DeactivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
+    status = DeactivateService("org.rdk.DeviceSettings");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
     removeFile("/tmp/pwrmgr_restarted");
     removeFile("/opt/persistent/ds/cecData_2.json");
     removeFile("/opt/uimgr_settings.bin");
@@ -538,7 +538,7 @@ protected:
     Exchange::IHdmiCecSink* m_cecSinkPlugin = nullptr;
     PluginHost::IShell* m_controller_cecSink = nullptr;
     Core::Sink<HdmiCecSinkNotificationHandler> m_notificationHandler;
-    IARM_EventHandler_t dsHdmiEventHandler;
+    dsHdmiInConnectCB_t m_dsHdmiInConnectCB = nullptr;
     IARM_EventHandler_t powerEventHandler = nullptr;
     FrameListener* registeredListener = nullptr;
     std::vector<FrameListener*> listeners;
@@ -641,14 +641,11 @@ HdmiCecSink_L2Test_STANDBY::HdmiCecSink_L2Test_STANDBY()
     ON_CALL(*p_messageEncoderMock, encode(::testing::Matcher<const UserControlPressed&>(::testing::_)))
         .WillByDefault(::testing::ReturnRef(CECFrame::getInstance()));
 
-    ON_CALL(*p_iarmBusImplMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInRegisterConnectCB(::testing::_))
         .WillByDefault(::testing::Invoke(
-            [&](const char* ownerName, IARM_EventId_t eventId, IARM_EventHandler_t handler) {
-                if ((string(IARM_BUS_DSMGR_NAME) == string(ownerName)) && (eventId == IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG)) {
-                    EXPECT_TRUE(handler != nullptr);
-                    dsHdmiEventHandler = handler;
-                }
-                return IARM_RESULT_SUCCESS;
+            [&](dsHdmiInConnectCB_t cbFunc) {
+                m_dsHdmiInConnectCB = cbFunc;
+                return dsERR_NONE;
             }));
 
     ON_CALL(*p_connectionMock, addFrameListener(::testing::_))
@@ -660,23 +657,25 @@ HdmiCecSink_L2Test_STANDBY::HdmiCecSink_L2Test_STANDBY()
     ON_CALL(*p_connectionMock, open())
         .WillByDefault(::testing::Return());
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getNumberOfInputs())
-        .WillRepeatedly(::testing::Return(3));
-
-    ON_CALL(*p_hdmiInputImplMock, isPortConnected(::testing::_))
-        .WillByDefault(::testing::Invoke(
-            [](int8_t port) {
-                return port == 1 ? true : false;
+    EXPECT_CALL(*p_dsHdmiInHalMock, dsHdmiInGetNumberOfInputs(::testing::_))
+        .WillRepeatedly(::testing::Invoke(
+            [](uint8_t* pNumberOfinputs) {
+                *pNumberOfinputs = 3;
+                return dsERR_NONE;
             }));
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getHDMIARCPortId(::testing::_))
-        .WillRepeatedly(::testing::Invoke(
-            [](int& portId) -> dsError_t {
-                portId = 1;
-                return static_cast<dsError_t>(0);
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInGetStatus(::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](dsHdmiInStatus_t* pStatus) {
+                memset(pStatus, 0, sizeof(dsHdmiInStatus_t));
+                pStatus->isPortConnected[dsHDMI_IN_PORT_1] = true;
+                return dsERR_NONE;
             }));
 
     /* Activate plugin in constructor */
+    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
     status = ActivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
@@ -704,6 +703,9 @@ HdmiCecSink_L2Test_STANDBY::~HdmiCecSink_L2Test_STANDBY()
         .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     status = DeactivateService("org.rdk.PowerManager");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
+    status = DeactivateService("org.rdk.DeviceSettings");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     removeFile("/opt/uimgr_settings.bin");

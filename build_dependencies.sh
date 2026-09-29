@@ -142,7 +142,6 @@ cd entservices-testframework/Tests
 echo " Empty mocks creation to avoid compilation errors"
 echo "======================================================================================"
 mkdir -p headers
-mkdir -p headers/rdk/ds
 mkdir -p headers/rdk/iarmbus
 mkdir -p headers/ccec/drivers
 mkdir -p headers/ccec/host
@@ -165,13 +164,6 @@ touch ccec/CECFrame.hpp
 touch ccec/MessageEncoder.hpp
 touch ccec/host/RDK.hpp
 touch websocket/URL.h
-touch rdk/ds/dsDisplay.h
-touch rdk/ds/dsError.h
-touch rdk/ds/exception.hpp
-touch rdk/ds/hdmiIn.hpp
-touch rdk/ds/host.hpp
-touch rdk/ds/manager.hpp
-touch rdk/ds/videoOutputPort.hpp
 touch rdk/iarmbus/libIARM.h
 touch rdk/iarmbus/libIBus.h
 touch rfcapi.h

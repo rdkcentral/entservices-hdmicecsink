@@ -476,10 +476,10 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
             }));
 
     /* Activate plugin in constructor */
-    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
+    status = ActivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
-    status = ActivateService("org.rdk.PowerManager");
+    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     status = ActivateService("org.rdk.HdmiCecSink");
@@ -506,6 +506,9 @@ HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
     status = DeactivateService("org.rdk.HdmiCecSink");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
+    status = DeactivateService("org.rdk.DeviceSettings");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
         .WillOnce(::testing::Return(PWRMGR_SUCCESS));
 
@@ -513,9 +516,6 @@ HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
         .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     status = DeactivateService("org.rdk.PowerManager");
-    EXPECT_EQ(Core::ERROR_NONE, status);
-
-    status = DeactivateService("org.rdk.DeviceSettings");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     removeFile("/tmp/pwrmgr_restarted");
@@ -673,10 +673,10 @@ HdmiCecSink_L2Test_STANDBY::HdmiCecSink_L2Test_STANDBY()
             }));
 
     /* Activate plugin in constructor */
-    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
+    status = ActivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
-    status = ActivateService("org.rdk.PowerManager");
+    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     status = ActivateService("org.rdk.HdmiCecSink");
@@ -696,6 +696,9 @@ HdmiCecSink_L2Test_STANDBY::~HdmiCecSink_L2Test_STANDBY()
     status = DeactivateService("org.rdk.HdmiCecSink");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
+    status = DeactivateService("org.rdk.DeviceSettings");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
         .WillOnce(::testing::Return(PWRMGR_SUCCESS));
 
@@ -703,9 +706,6 @@ HdmiCecSink_L2Test_STANDBY::~HdmiCecSink_L2Test_STANDBY()
         .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     status = DeactivateService("org.rdk.PowerManager");
-    EXPECT_EQ(Core::ERROR_NONE, status);
-
-    status = DeactivateService("org.rdk.DeviceSettings");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     removeFile("/opt/uimgr_settings.bin");

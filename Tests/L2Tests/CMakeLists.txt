@@ -60,6 +60,17 @@ else (MOCKACCESSOR_LIBRARIES)
      message ("Require ${MOCKACCESSOR_LIBRARIES} library")
 endif (MOCKACCESSOR_LIBRARIES)
 
+# L2TestsMock.cpp (compiled directly into libWPEFrameworkL2Tests.so) calls Ds*Api::setImpl() for every
+# DeviceSettings HAL mock; without this, loading L2Tests.so fails at runtime with
+# "undefined symbol: DsAudioApi::setImpl(...)" since ds-hal.so is otherwise never pulled into the process.
+find_library(DSHAL_LIBRARIES NAMES ds-hal)
+if (DSHAL_LIBRARIES)
+    message ("Found ds-hal library - ${DSHAL_LIBRARIES}")
+    target_link_libraries(${MODULE_NAME} PRIVATE ${DSHAL_LIBRARIES})
+else (DSHAL_LIBRARIES)
+    message ("Require ${DSHAL_LIBRARIES} library")
+endif (DSHAL_LIBRARIES)
+
 target_include_directories(
     ${MODULE_NAME} PRIVATE ./
     ${CMAKE_SOURCE_DIR}/../entservices-helpers/helpers

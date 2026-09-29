@@ -76,6 +76,17 @@ static void createFile(const char* fileName, const char* fileContent)
     fileContentStream.close();
 }
 
+// Seeded at static-init time (before any TEST_F body or DeviceSettings activation ever runs) so the ARC
+// port id lookup succeeds on the very first activation, regardless of exactly when/which component first
+// touches device::HostPersistence's underlying singleton. Port 0 -> physical address {1,0,0,0}, matching
+// the injected Audio System device's reported physical address (0x10 0x00) in
+// InjectInitiateAndTerminateArcFrameAndVerifyEvent; without this, GetAudioHDMIARCPortId() falls back to -1
+// and Process_InitiateArc() is never invoked.
+static bool g_hostDataDefaultSeeded = []() {
+    createFile("/etc/hostDataDefault", "HDMIARC.port.Id\t0");
+    return true;
+}();
+
 // The real ds-hal only invokes dsHdmiInRegisterConnectCB once for the lifetime of the test binary
 // (guarded by static HAL init state that survives DeviceSettings plugin deactivate/reactivate cycles),
 // so this must be captured process-wide rather than reset per test fixture instance.
@@ -365,10 +376,7 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     createFile("/etc/device.properties", "RDK_PROFILE=TV");
     createFile("/opt/persistent/ds/cecData_2.json", "0");
     createFile("/tmp/pwrmgr_restarted", "2");
-    // ARC port 0 -> physical address {1,0,0,0}, matching the injected Audio System device's
-    // reported physical address (0x10 0x00) in InjectInitiateAndTerminateArcFrameAndVerifyEvent;
-    // without this, GetAudioHDMIARCPortId() falls back to -1 and Process_InitiateArc() is never invoked.
-    createFile("/etc/hostDataDefault", "HDMIARC.port.Id\t0");
+    // /etc/hostDataDefault (HDMIARC.port.Id) is seeded once at static-init time — see g_hostDataDefaultSeeded.
 
     // Add sleep to ensure file is properly written to disk
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

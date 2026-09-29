@@ -25,6 +25,10 @@
 #include <interfaces/IHdmiCecSink.h>
 // Used to change the power state for onpowermodechanged event
 #include <interfaces/IPowerManager.h>
+// Needed for Plugin::HdmiCecSinkImplementation::_instance / EV_HDMI_HOTPLUG dispatch and
+// Exchange::IDeviceSettingsHDMIIn::DS_HDMI_IN_PORT_1 used by the hotplug simulation test below
+#include "HdmiCecSinkImplementation.h"
+#include <interfaces/IDeviceSettingsHDMIIn.h>
 
 #define EVNT_TIMEOUT (5000)
 #define HDMICECSINK_CALLSIGN _T("org.rdk.HdmiCecSink.1")

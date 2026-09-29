@@ -671,6 +671,9 @@ TEST_F(HdmiCecSinkDsTest, getAudioDeviceConnectedStatus)
 
 TEST_F(HdmiCecSinkDsTest, requestAudioDevicePowerStatus)
 {
+    // RequestAudioDevicePowerStatus requires CEC to be enabled (and a logical address allocated) first
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setEnabled"), _T("{\"enabled\":true}"), response));
+
     EXPECT_CALL(*p_connectionImplMock, sendTo(::testing::_, ::testing::_, ::testing::_))
         .WillRepeatedly(::testing::Return());
     
@@ -680,9 +683,8 @@ TEST_F(HdmiCecSinkDsTest, requestAudioDevicePowerStatus)
 
 TEST_F(HdmiCecSinkDsTest, getDeviceList_ConnectionClosed)
 {
-    EXPECT_CALL(*p_connectionImplMock, close())
-        .WillOnce(::testing::Return());
-    
+    // GetDeviceList only reads the cached device list; it never touches smConnection, so no close()
+    // is expected here (that only happens via CECDisable()).
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("getDeviceList"), _T("{}"), response));
 }
 
@@ -2564,10 +2566,13 @@ TEST_F(HdmiCecSinkFrameProcessingTest, InjectReportPowerStatus_AudioSystem_After
 
     // First, simulate requesting audio device power status by calling the API
     // This sets m_audioDevicePowerStatusRequested flag to true
+    // RequestAudioDevicePowerStatus requires CEC to be enabled (and a logical address allocated) first
+    string requestResponse;
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setEnabled"), _T("{\"enabled\":true}"), requestResponse));
+
     EXPECT_CALL(*p_connectionImplMock, sendTo(::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return());
 
-    string requestResponse;
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestAudioDevicePowerStatus"), _T("{}"), requestResponse));
 
     // Small delay to ensure the request is processed

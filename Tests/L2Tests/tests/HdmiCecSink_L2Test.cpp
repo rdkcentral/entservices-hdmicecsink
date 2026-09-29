@@ -75,6 +75,11 @@ static void createFile(const char* fileName, const char* fileContent)
     fileContentStream << "\n";
     fileContentStream.close();
 }
+
+// The real ds-hal only invokes dsHdmiInRegisterConnectCB once for the lifetime of the test binary
+// (guarded by static HAL init state that survives DeviceSettings plugin deactivate/reactivate cycles),
+// so this must be captured process-wide rather than reset per test fixture instance.
+static dsHdmiInConnectCB_t g_dsHdmiInConnectCB = nullptr;
 }
 
 // Event flags for different CEC events
@@ -340,7 +345,6 @@ protected:
     Exchange::IHdmiCecSink* m_cecSinkPlugin = nullptr;
     PluginHost::IShell* m_controller_cecSink = nullptr;
     Core::Sink<HdmiCecSinkNotificationHandler> m_notificationHandler;
-    dsHdmiInConnectCB_t m_dsHdmiInConnectCB = nullptr;
     IARM_EventHandler_t powerEventHandler = nullptr;
     FrameListener* registeredListener = nullptr;
     std::vector<FrameListener*> listeners;
@@ -361,6 +365,10 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     createFile("/etc/device.properties", "RDK_PROFILE=TV");
     createFile("/opt/persistent/ds/cecData_2.json", "0");
     createFile("/tmp/pwrmgr_restarted", "2");
+    // ARC port 0 -> physical address {1,0,0,0}, matching the injected Audio System device's
+    // reported physical address (0x10 0x00) in InjectInitiateAndTerminateArcFrameAndVerifyEvent;
+    // without this, GetAudioHDMIARCPortId() falls back to -1 and Process_InitiateArc() is never invoked.
+    createFile("/etc/hostDataDefault", "HDMIARC.port.Id\t0");
 
     // Add sleep to ensure file is properly written to disk
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -447,7 +455,7 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     ON_CALL(*p_dsHdmiInHalMock, dsHdmiInRegisterConnectCB(::testing::_))
         .WillByDefault(::testing::Invoke(
             [&](dsHdmiInConnectCB_t cbFunc) {
-                m_dsHdmiInConnectCB = cbFunc;
+                g_dsHdmiInConnectCB = cbFunc;
                 return dsERR_NONE;
             }));
 
@@ -474,6 +482,13 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
                 pStatus->isPortConnected[dsHDMI_IN_PORT_1] = true;
                 return dsERR_NONE;
             }));
+
+    // Set up expectations for PowerManager termination (will be called in destructor)
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
+        .WillOnce(::testing::Return(PWRMGR_SUCCESS));
+
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
+        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     /* Activate plugin in constructor */
     status = ActivateService("org.rdk.PowerManager");
@@ -509,12 +524,7 @@ HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
     status = DeactivateService("org.rdk.DeviceSettings");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
-    EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
-        .WillOnce(::testing::Return(PWRMGR_SUCCESS));
-
-    EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
-        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
-
+    // PLAT_TERM and PLAT_DS_TERM expectations are now set in constructor
     status = DeactivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
@@ -538,7 +548,6 @@ protected:
     Exchange::IHdmiCecSink* m_cecSinkPlugin = nullptr;
     PluginHost::IShell* m_controller_cecSink = nullptr;
     Core::Sink<HdmiCecSinkNotificationHandler> m_notificationHandler;
-    dsHdmiInConnectCB_t m_dsHdmiInConnectCB = nullptr;
     IARM_EventHandler_t powerEventHandler = nullptr;
     FrameListener* registeredListener = nullptr;
     std::vector<FrameListener*> listeners;
@@ -644,7 +653,7 @@ HdmiCecSink_L2Test_STANDBY::HdmiCecSink_L2Test_STANDBY()
     ON_CALL(*p_dsHdmiInHalMock, dsHdmiInRegisterConnectCB(::testing::_))
         .WillByDefault(::testing::Invoke(
             [&](dsHdmiInConnectCB_t cbFunc) {
-                m_dsHdmiInConnectCB = cbFunc;
+                g_dsHdmiInConnectCB = cbFunc;
                 return dsERR_NONE;
             }));
 
@@ -1879,10 +1888,10 @@ TEST_F(HdmiCecSink_L2Test, Hdmihotplug_COMRPC_PlugIn_and_PlugOut)
                 // Simulate the physical hotplug via the real DsHdmiInHalMock-registered callback so the
                 // event genuinely round-trips through the real DeviceSettings plugin -> COM-RPC
                 // notification -> HdmiCecSinkImplementation, exactly like production hardware would.
-                ASSERT_NE(m_dsHdmiInConnectCB, nullptr);
-                m_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, true);
+                ASSERT_NE(g_dsHdmiInConnectCB, nullptr);
+                g_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, true);
                 std::this_thread::sleep_for(std::chrono::seconds(2));
-                m_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, false);
+                g_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, false);
                 m_cecSinkPlugin->Release();
             }
             m_controller_cecSink->Release();
@@ -3412,6 +3421,25 @@ TEST_F(HdmiCecSink_L2Test, InjectInitiateAndTerminateArcFrameAndVerifyEvent)
     uint32_t status = Core::ERROR_GENERAL;
     uint32_t signalled = HDMICECSINK_STATUS_INVALID;
 
+    // Add a small delay to ensure HdmiCecSink plugin is fully initialized
+    // and has queried the power state from PowerManager
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    ASSERT_FALSE(listeners.empty());
+
+    // First, register an Audio System device at logical address 5
+    // Report Physical Address: From Audio System (5) to broadcast
+    // Physical Address: 0x10, 0x00 (port 1), Device Type: 0x05 (Audio System)
+    uint8_t reportPhysAddrBuffer[] = { 0x5F, 0x84, 0x10, 0x00, 0x05 };
+    CECFrame reportPhysAddrFrame(reportPhysAddrBuffer, sizeof(reportPhysAddrBuffer));
+    for (auto* listener : listeners) {
+        if (listener)
+            listener->notify(reportPhysAddrFrame);
+    }
+
+    // Wait for device to be registered
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
     status = jsonrpc.Subscribe<JsonObject>(EVNT_TIMEOUT,
         _T("arcInitiationEvent"),
         &AsyncHandlerMock_HdmiCecSink::arcInitiationEvent,
@@ -3420,8 +3448,6 @@ TEST_F(HdmiCecSink_L2Test, InjectInitiateAndTerminateArcFrameAndVerifyEvent)
 
     EXPECT_CALL(async_handler, arcInitiationEvent(::testing::_))
         .WillOnce(Invoke(this, &HdmiCecSink_L2Test::arcInitiationEvent));
-
-    ASSERT_FALSE(listeners.empty());
 
     // Inject Initiate ARC frame
     uint8_t initbuffer[] = { 0x50, 0xC0 }; // From Audio System (5) to TV (0)

@@ -19,12 +19,15 @@
 #include "L2Tests.h"
 #include "L2TestsMock.h"
 #include <condition_variable>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <interfaces/IHdmiCecSink.h>
 // Used to change the power state for onpowermodechanged event
 #include <interfaces/IPowerManager.h>
+#include <unistd.h>
 
 #define EVNT_TIMEOUT (5000)
 #define HDMICECSINK_CALLSIGN _T("org.rdk.HdmiCecSink.1")
@@ -70,10 +73,45 @@ static void removeFile(const char* fileName)
 
 static void createFile(const char* fileName, const char* fileContent)
 {
-    std::ofstream fileContentStream(fileName);
-    fileContentStream << fileContent;
-    fileContentStream << "\n";
-    fileContentStream.close();
+    // Root cause of a previously-silent test failure: a brand-new file under /etc/ (or the other
+    // sudo-protected paths handled by removeFile() above) cannot be *created* by a plain std::ofstream
+    // when the CI runner user is unprivileged — unlike /etc/device.properties, which the workflow's
+    // "Set up files" step pre-`sudo touch`+`sudo chmod 777`s so a plain overwrite works, nothing
+    // pre-creates arbitrary new /etc paths. std::ofstream does not throw on open() failure by default,
+    // so the write silently no-ops: no exception, no error, just an empty/non-existent file and a
+    // downstream consumer (e.g. device::HostPersistence::load()) that reports "loaded 0 default
+    // properties" with no indication *why*. Use sudo (already relied upon by removeFile() above and
+    // proven passwordless in this CI) for any path we don't own outright.
+    if (strncmp(fileName, "/etc/", 5) == 0 || strcmp(fileName, "/opt/persistent/ds/cecData_2.json") == 0 || strcmp(fileName, "/opt/uimgr_settings.bin") == 0) {
+        char tmpName[] = "/tmp/createFileXXXXXX";
+        int fd = mkstemp(tmpName);
+        if (fd == -1) {
+            printf("File %s failed to create: could not create temp staging file\n", fileName);
+            perror("Error creating temp file");
+            return;
+        }
+        std::string contentWithNewline = std::string(fileContent) + "\n";
+        if (write(fd, contentWithNewline.c_str(), contentWithNewline.size()) < 0) {
+            printf("File %s failed to create: could not write temp staging file\n", fileName);
+            perror("Error writing temp file");
+        }
+        close(fd);
+
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd), "sudo cp %s %s && sudo chmod 666 %s", tmpName, fileName, fileName);
+        int ret = system(cmd);
+        std::remove(tmpName);
+        if (ret != 0) {
+            printf("File %s failed to create with sudo\n", fileName);
+        } else {
+            printf("File %s successfully created with sudo\n", fileName);
+        }
+    } else {
+        std::ofstream fileContentStream(fileName);
+        fileContentStream << fileContent;
+        fileContentStream << "\n";
+        fileContentStream.close();
+    }
 }
 
 // Seeded at static-init time (before any TEST_F body or DeviceSettings activation ever runs) so the ARC

@@ -63,10 +63,12 @@ endif (MOCKACCESSOR_LIBRARIES)
 # L2TestsMock.cpp (compiled directly into libWPEFrameworkL2Tests.so) calls Ds*Api::setImpl() for every
 # DeviceSettings HAL mock; without this, loading L2Tests.so fails at runtime with
 # "undefined symbol: DsAudioApi::setImpl(...)" since ds-hal.so is otherwise never pulled into the process.
+# This test file only touches the HAL mock classes (no direct ds-hal.so symbol reference), so the linker's
+# --as-needed default would otherwise drop the DT_NEEDED entry entirely — force it to be kept.
 find_library(DSHAL_LIBRARIES NAMES ds-hal)
 if (DSHAL_LIBRARIES)
     message ("Found ds-hal library - ${DSHAL_LIBRARIES}")
-    target_link_libraries(${MODULE_NAME} PRIVATE ${DSHAL_LIBRARIES})
+    target_link_libraries(${MODULE_NAME} PRIVATE -Wl,--no-as-needed ${DSHAL_LIBRARIES} -Wl,--as-needed)
 else (DSHAL_LIBRARIES)
     message ("Require ${DSHAL_LIBRARIES} library")
 endif (DSHAL_LIBRARIES)

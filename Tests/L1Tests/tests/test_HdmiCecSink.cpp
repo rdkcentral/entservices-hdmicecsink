@@ -2570,8 +2570,10 @@ TEST_F(HdmiCecSinkFrameProcessingTest, InjectReportPowerStatus_AudioSystem_After
     string requestResponse;
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("setEnabled"), _T("{\"enabled\":true}"), requestResponse));
 
+    // Once CEC is enabled the background poll thread can also request info (OSD name/vendor id) from
+    // newly-discovered devices, so more than one sendTo() call is expected/legitimate here.
     EXPECT_CALL(*p_connectionImplMock, sendTo(::testing::_, ::testing::_, ::testing::_))
-        .WillOnce(::testing::Return());
+        .WillRepeatedly(::testing::Return());
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("requestAudioDevicePowerStatus"), _T("{}"), requestResponse));
 

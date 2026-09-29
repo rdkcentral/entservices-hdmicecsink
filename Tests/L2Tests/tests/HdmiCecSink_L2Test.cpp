@@ -25,10 +25,6 @@
 #include <interfaces/IHdmiCecSink.h>
 // Used to change the power state for onpowermodechanged event
 #include <interfaces/IPowerManager.h>
-// Needed for Plugin::HdmiCecSinkImplementation::_instance / EV_HDMI_HOTPLUG dispatch and
-// Exchange::IDeviceSettingsHDMIIn::DS_HDMI_IN_PORT_1 used by the hotplug simulation test below
-#include "HdmiCecSinkImplementation.h"
-#include <interfaces/IDeviceSettingsHDMIIn.h>
 
 #define EVNT_TIMEOUT (5000)
 #define HDMICECSINK_CALLSIGN _T("org.rdk.HdmiCecSink.1")
@@ -1880,18 +1876,13 @@ TEST_F(HdmiCecSink_L2Test, Hdmihotplug_COMRPC_PlugIn_and_PlugOut)
         if (m_controller_cecSink) {
             EXPECT_TRUE(m_cecSinkPlugin != nullptr);
             if (m_cecSinkPlugin) {
-                ASSERT_NE(Plugin::HdmiCecSinkImplementation::_instance, nullptr);
-                Plugin::HdmiCecSinkImplementation::_instance->dispatchEvent(
-                    Plugin::HdmiCecSinkImplementation::EV_HDMI_HOTPLUG,
-                    std::make_tuple(
-                        static_cast<int>(Exchange::IDeviceSettingsHDMIIn::DS_HDMI_IN_PORT_1),
-                        static_cast<int>(true)));
+                // Simulate the physical hotplug via the real DsHdmiInHalMock-registered callback so the
+                // event genuinely round-trips through the real DeviceSettings plugin -> COM-RPC
+                // notification -> HdmiCecSinkImplementation, exactly like production hardware would.
+                ASSERT_NE(m_dsHdmiInConnectCB, nullptr);
+                m_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, true);
                 std::this_thread::sleep_for(std::chrono::seconds(2));
-                Plugin::HdmiCecSinkImplementation::_instance->dispatchEvent(
-                    Plugin::HdmiCecSinkImplementation::EV_HDMI_HOTPLUG,
-                    std::make_tuple(
-                        static_cast<int>(Exchange::IDeviceSettingsHDMIIn::DS_HDMI_IN_PORT_1),
-                        static_cast<int>(false)));
+                m_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, false);
                 m_cecSinkPlugin->Release();
             }
             m_controller_cecSink->Release();

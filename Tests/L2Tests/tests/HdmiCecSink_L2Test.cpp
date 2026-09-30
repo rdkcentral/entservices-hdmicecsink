@@ -151,10 +151,12 @@ static void createFile(const char* fileName, const char* fileContent)
 
 // Seeded at static-init time (before any TEST_F body or DeviceSettings activation ever runs) so the ARC
 // port id lookup succeeds on the very first activation, regardless of exactly when/which component first
-// touches device::HostPersistence's underlying singleton. Port 0 -> physical address {1,0,0,0}, matching
-// the injected Audio System device's reported physical address (0x10 0x00) in
-// InjectInitiateAndTerminateArcFrameAndVerifyEvent; without this, GetAudioHDMIARCPortId() falls back to -1
-// and Process_InitiateArc() is never invoked.
+// touches device::HostPersistence's underlying singleton. Without this, GetAudioHDMIARCPortId() falls
+// back to -1, HdmiArcPortID stays -1, and HdmiCecSinkProcessor::process(const InitiateArc&, ...) returns
+// before Process_InitiateArc() is ever invoked (see InjectInitiateAndTerminateArcFrameAndVerifyEvent) —
+// note that test does NOT need the physical address value itself to be correct, only non-(-1): the
+// InitiateArc handler treats a never-registered device (the default state of every deviceList[] entry,
+// see CECDeviceParams::clear()) as an automatic match via its "invalid address" fallback branch.
 static bool g_hostDataDefaultSeeded = []() {
     createFile("/etc/hostDataDefault", "HDMIARC.port.Id\t0");
     return true;
@@ -3502,25 +3504,6 @@ TEST_F(HdmiCecSink_L2Test, InjectInitiateAndTerminateArcFrameAndVerifyEvent)
     uint32_t status = Core::ERROR_GENERAL;
     uint32_t signalled = HDMICECSINK_STATUS_INVALID;
 
-    // Add a small delay to ensure HdmiCecSink plugin is fully initialized
-    // and has queried the power state from PowerManager
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    ASSERT_FALSE(listeners.empty());
-
-    // First, register an Audio System device at logical address 5
-    // Report Physical Address: From Audio System (5) to broadcast
-    // Physical Address: 0x10, 0x00 (port 1), Device Type: 0x05 (Audio System)
-    uint8_t reportPhysAddrBuffer[] = { 0x5F, 0x84, 0x10, 0x00, 0x05 };
-    CECFrame reportPhysAddrFrame(reportPhysAddrBuffer, sizeof(reportPhysAddrBuffer));
-    for (auto* listener : listeners) {
-        if (listener)
-            listener->notify(reportPhysAddrFrame);
-    }
-
-    // Wait for device to be registered
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
     status = jsonrpc.Subscribe<JsonObject>(EVNT_TIMEOUT,
         _T("arcInitiationEvent"),
         &AsyncHandlerMock_HdmiCecSink::arcInitiationEvent,
@@ -3529,6 +3512,8 @@ TEST_F(HdmiCecSink_L2Test, InjectInitiateAndTerminateArcFrameAndVerifyEvent)
 
     EXPECT_CALL(async_handler, arcInitiationEvent(::testing::_))
         .WillOnce(Invoke(this, &HdmiCecSink_L2Test::arcInitiationEvent));
+
+    ASSERT_FALSE(listeners.empty());
 
     // Inject Initiate ARC frame
     uint8_t initbuffer[] = { 0x50, 0xC0 }; // From Audio System (5) to TV (0)

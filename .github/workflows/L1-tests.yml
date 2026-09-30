@@ -122,7 +122,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 2.0.0
+          ref: feature/RDKEMW-25013
 
       - name: Checkout entservices-hdmicecsink
         if: ${{ inputs.caller_source == 'local' }}
@@ -209,7 +209,6 @@ jobs:
           mkdir -p
           headers
           headers/audiocapturemgr
-          headers/rdk/ds
           headers/rdk/iarmbus
           headers/rdk/iarmmgrs-hal
           headers/rdk/halif/
@@ -234,30 +233,6 @@ jobs:
           ccec/MessageEncoder.hpp
           ccec/CCEC.hpp
           ccec/host/RDK.hpp
-          rdk/ds/audioOutputPort.hpp
-          rdk/ds/compositeIn.hpp
-          rdk/ds/dsDisplay.h
-          rdk/ds/dsError.h
-          rdk/ds/dsMgr.h
-          rdk/ds/dsTypes.h
-          rdk/ds/dsUtl.h
-          rdk/ds/exception.hpp
-          rdk/ds/hdmiIn.hpp
-          rdk/ds/host.hpp
-          rdk/ds/list.hpp
-          rdk/ds/manager.hpp
-          rdk/ds/sleepMode.hpp
-          rdk/ds/videoDevice.hpp
-          rdk/ds/videoOutputPort.hpp
-          rdk/ds/videoOutputPortConfig.hpp
-          rdk/ds/videoOutputPortType.hpp
-          rdk/ds/videoResolution.hpp
-          rdk/ds/frontPanelIndicator.hpp
-          rdk/ds/frontPanelConfig.hpp
-          rdk/ds/frontPanelTextDisplay.hpp
-          rdk/ds/audioOutputPortType.hpp
-          rdk/ds/audioOutputPortConfig.hpp
-          rdk/ds/pixelResolution.hpp
           rdk/iarmbus/libIARM.h
           rdk/iarmbus/libIBus.h
           rdk/iarmbus/libIBusDaemon.h
@@ -269,7 +244,6 @@ jobs:
           libudev.h
           rfcapi.h
           rbus.h
-          dsRpc.h
           motionDetector.h
           telemetry_busmessage_sender.h
           maintenanceMGR.h
@@ -359,7 +333,6 @@ jobs:
           -DRDK_SERVICES_L1_TEST
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/audiocapturemgr
-          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
@@ -368,7 +341,6 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-helpers/helpers
           -I $GITHUB_WORKSPACE/install/usr/include
           -I ./usr/include/libdrm
-          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
@@ -416,7 +388,6 @@ jobs:
           -DRDK_SERVICES_L1_TEST
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/audiocapturemgr
-          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
@@ -424,7 +395,6 @@ jobs:
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests
           -I $GITHUB_WORKSPACE/install/usr/include
           -I $GITHUB_WORKSPACE/install/usr/include/WPEFramework
-          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h
@@ -487,7 +457,6 @@ jobs:
           -DRDK_SERVICES_L1_TEST
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/audiocapturemgr
-          -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/ds
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmbus
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/rdk/iarmmgrs-hal
           -I $GITHUB_WORKSPACE/entservices-testframework/Tests/headers/ccec/drivers
@@ -499,7 +468,6 @@ jobs:
           -I $GITHUB_WORKSPACE/install/usr/include
           -I $GITHUB_WORKSPACE/install/usr/include/WPEFramework
           -I ./usr/include/libdrm
-          -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/devicesettings.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Iarm.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/Rfc.h
           -include $GITHUB_WORKSPACE/entservices-testframework/Tests/mocks/RBus.h

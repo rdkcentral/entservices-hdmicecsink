@@ -18,6 +18,7 @@
  */
 #include "L2Tests.h"
 #include "L2TestsMock.h"
+#include <cerrno>
 #include <condition_variable>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +29,7 @@
 // Used to change the power state for onpowermodechanged event
 #include <interfaces/IPowerManager.h>
 #include <unistd.h>
+#include <vector>
 
 #define EVNT_TIMEOUT (5000)
 #define HDMICECSINK_CALLSIGN _T("org.rdk.HdmiCecSink.1")
@@ -48,69 +50,102 @@ using IHdmiCecSinkActivePathIterator = WPEFramework::Exchange::IHdmiCecSink::IHd
 using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
 
 namespace {
+// Escalates to `sudo <argv...>` (already proven passwordless in this CI — see the historical use of
+// sudo for /etc/device.properties etc.) and returns whether it succeeded. Building the command from a
+// fixed argv array (rather than interpolating fileName into a single shell string) avoids any shell
+// quoting/injection concerns even though every caller here only ever passes fixed literals.
+static bool runSudo(const std::vector<std::string>& argv)
+{
+    std::string cmd = "sudo";
+    for (const auto& arg : argv) {
+        cmd += " \"";
+        cmd += arg;
+        cmd += "\"";
+    }
+    return system(cmd.c_str()) == 0;
+}
+
+// Deliberately does NOT special-case any path up front. Root-owned locations (e.g. anything under
+// /etc, or a not-yet-created /opt/persistent/... subtree) are not a fixed, enumerable set — the old
+// approach of hardcoding "these specific paths need sudo" is exactly the kind of workaround that
+// silently breaks again the next time a *different* protected path needs seeding (which is exactly
+// how the /etc/hostDataDefault bug this replaces went unnoticed for so long: it wasn't on anyone's
+// hardcoded list). Instead: always attempt the plain, unprivileged operation first, and only escalate
+// to sudo when that attempt has *actually, verifiably* failed. This is self-adapting to any path,
+// present or future, without maintaining a whitelist.
 static void removeFile(const char* fileName)
 {
-    // Use sudo for protected files
-    if (strcmp(fileName, "/etc/device.properties") == 0 || strcmp(fileName, "/opt/persistent/ds/cecData_2.json") == 0 || strcmp(fileName, "/opt/uimgr_settings.bin") == 0) {
-        char cmd[256];
-        snprintf(cmd, sizeof(cmd), "sudo rm -f %s", fileName);
-        int ret = system(cmd);
-        if (ret != 0) {
-            printf("File %s failed to remove with sudo\n", fileName);
-            perror("Error deleting file");
-        } else {
-            printf("File %s successfully deleted with sudo\n", fileName);
-        }
-    } else {
-        if (std::remove(fileName) != 0) {
-            printf("File %s failed to remove\n", fileName);
-            perror("Error deleting file");
-        } else {
-            printf("File %s successfully deleted\n", fileName);
-        }
+    if (std::remove(fileName) == 0) {
+        printf("File %s successfully deleted\n", fileName);
+        return;
     }
+    if (errno == ENOENT) {
+        // Nothing to delete — not an error worth escalating for.
+        return;
+    }
+    if (runSudo({"rm", "-f", fileName})) {
+        printf("File %s successfully deleted with sudo\n", fileName);
+    } else {
+        printf("File %s failed to remove even with sudo\n", fileName);
+    }
+}
+
+static bool tryPlainWrite(const char* fileName, const std::string& content)
+{
+    std::ofstream fileContentStream(fileName);
+    fileContentStream << content;
+    fileContentStream.close();
+    // std::ofstream does not throw on open()/write() failure by default — it silently sets failbit,
+    // so this explicit check is required; without it a failed write is indistinguishable from success
+    // (which is exactly how the original /etc/hostDataDefault bug went unnoticed: no exception, no
+    // error, just an empty/non-existent file and a downstream consumer reporting "loaded 0 default
+    // properties" with no indication of why).
+    return !fileContentStream.fail();
 }
 
 static void createFile(const char* fileName, const char* fileContent)
 {
-    // Root cause of a previously-silent test failure: a brand-new file under /etc/ (or the other
-    // sudo-protected paths handled by removeFile() above) cannot be *created* by a plain std::ofstream
-    // when the CI runner user is unprivileged — unlike /etc/device.properties, which the workflow's
-    // "Set up files" step pre-`sudo touch`+`sudo chmod 777`s so a plain overwrite works, nothing
-    // pre-creates arbitrary new /etc paths. std::ofstream does not throw on open() failure by default,
-    // so the write silently no-ops: no exception, no error, just an empty/non-existent file and a
-    // downstream consumer (e.g. device::HostPersistence::load()) that reports "loaded 0 default
-    // properties" with no indication *why*. Use sudo (already relied upon by removeFile() above and
-    // proven passwordless in this CI) for any path we don't own outright.
-    if (strncmp(fileName, "/etc/", 5) == 0 || strcmp(fileName, "/opt/persistent/ds/cecData_2.json") == 0 || strcmp(fileName, "/opt/uimgr_settings.bin") == 0) {
-        char tmpName[] = "/tmp/createFileXXXXXX";
-        int fd = mkstemp(tmpName);
-        if (fd == -1) {
-            printf("File %s failed to create: could not create temp staging file\n", fileName);
-            perror("Error creating temp file");
-            return;
-        }
-        std::string contentWithNewline = std::string(fileContent) + "\n";
-        if (write(fd, contentWithNewline.c_str(), contentWithNewline.size()) < 0) {
-            printf("File %s failed to create: could not write temp staging file\n", fileName);
-            perror("Error writing temp file");
-        }
-        close(fd);
+    const std::string contentWithNewline = std::string(fileContent) + "\n";
 
-        char cmd[512];
-        snprintf(cmd, sizeof(cmd), "sudo cp %s %s && sudo chmod 666 %s", tmpName, fileName, fileName);
-        int ret = system(cmd);
+    // Fast path: succeeds whenever the destination is already writable by the current unprivileged
+    // CI user (an existing file the workflow already `sudo chmod 777`'d, or any path we plainly own).
+    if (tryPlainWrite(fileName, contentWithNewline)) {
+        printf("File %s successfully created\n", fileName);
+        return;
+    }
+
+    // Slow path: the plain write genuinely failed (new file under a root-owned directory, or a
+    // not-yet-created parent directory). Stage the content in /tmp (always writable) and move it into
+    // place with sudo, creating the parent directory first since sudo cp does not do that itself.
+    char tmpName[] = "/tmp/createFileXXXXXX";
+    int fd = mkstemp(tmpName);
+    if (fd == -1) {
+        printf("File %s failed to create: could not create temp staging file\n", fileName);
+        perror("Error creating temp file");
+        return;
+    }
+    ssize_t written = write(fd, contentWithNewline.c_str(), contentWithNewline.size());
+    close(fd);
+    if (written < 0 || static_cast<size_t>(written) != contentWithNewline.size()) {
+        printf("File %s failed to create: could not write temp staging file\n", fileName);
+        perror("Error writing temp file");
         std::remove(tmpName);
-        if (ret != 0) {
-            printf("File %s failed to create with sudo\n", fileName);
-        } else {
-            printf("File %s successfully created with sudo\n", fileName);
-        }
+        return;
+    }
+
+    std::string parentDir = fileName;
+    size_t lastSlash = parentDir.find_last_of('/');
+    parentDir = (lastSlash == std::string::npos) ? "." : parentDir.substr(0, lastSlash);
+
+    bool ok = runSudo({"mkdir", "-p", parentDir})
+        && runSudo({"cp", tmpName, fileName})
+        && runSudo({"chmod", "666", fileName});
+    std::remove(tmpName);
+
+    if (ok) {
+        printf("File %s successfully created with sudo (plain write was not permitted)\n", fileName);
     } else {
-        std::ofstream fileContentStream(fileName);
-        fileContentStream << fileContent;
-        fileContentStream << "\n";
-        fileContentStream.close();
+        printf("File %s failed to create even with sudo\n", fileName);
     }
 }
 

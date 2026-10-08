@@ -112,7 +112,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: develop
+          ref: 2.1.0
 
       # HdmiCecSink talks to DeviceSettings over COM-RPC for HDMI-In port state and ARC port id.
       # The real entservices-devicesettings plugin is built and activated in the L2 test; its

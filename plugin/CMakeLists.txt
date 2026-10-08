@@ -48,12 +48,10 @@ target_compile_definitions(${MODULE_NAME} PRIVATE MODULE_NAME=Plugin_${PLUGIN_NA
 find_package(CEC)
 find_package(Telemetry)
 
-target_include_directories(${MODULE_NAME} PRIVATE ${IARMBUS_INCLUDE_DIRS})
 target_include_directories(${MODULE_NAME} PRIVATE ${CEC_INCLUDE_DIRS})
 set_source_files_properties(HdmiCecSink.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
 
 
-target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${IARMBUS_INCLUDE_DIRS})
 target_include_directories(${PLUGIN_IMPLEMENTATION} PRIVATE ${CEC_INCLUDE_DIRS})
 set_source_files_properties(HdmiCecSinkImplementation.cpp PROPERTIES COMPILE_FLAGS "-fexceptions")
 

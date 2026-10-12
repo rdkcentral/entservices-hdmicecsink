@@ -89,25 +89,25 @@ namespace WPEFramework {
                                    _parent.Deactivated(connection);
                                 }
 
-                                void ArcInitiationEvent(const string  success) override
+                                void ArcInitiationEvent(string success) override
                                 {
                                     LOGINFO("ArcInitiationEvent");
                                     LOGINFO("success: %s", success.c_str());
-                                    Exchange::JHdmiCecSink::Event::ArcInitiationEvent(_parent, success);
+                                    Exchange::JHdmiCecSink::Event::ArcInitiationEvent(_parent, std::move(success));
                                 }
 
-                                void ArcTerminationEvent(const string success) override
+                                void ArcTerminationEvent(string success) override
                                 {
                                     LOGINFO("ArcTerminationEvent");
                                     LOGINFO("success: %s", success.c_str());
-                                    Exchange::JHdmiCecSink::Event::ArcTerminationEvent(_parent, success);
+                                    Exchange::JHdmiCecSink::Event::ArcTerminationEvent(_parent, std::move(success));
                                 }
 
-                                void OnActiveSourceChange(const int logicalAddress, const string physicalAddress) override
+                                void OnActiveSourceChange(const int logicalAddress, string physicalAddress) override
                                 {
                                     LOGINFO("OnActiveSourceChange");
                                     LOGINFO("logicalAddress: %d, physicalAddress: %s", logicalAddress, physicalAddress.c_str());
-                                    Exchange::JHdmiCecSink::Event::OnActiveSourceChange(_parent, logicalAddress, physicalAddress);
+                                    Exchange::JHdmiCecSink::Event::OnActiveSourceChange(_parent, logicalAddress, std::move(physicalAddress));
                                 }
 
                                 void OnDeviceAdded(const int logicalAddress) override
@@ -138,11 +138,11 @@ namespace WPEFramework {
                                     Exchange::JHdmiCecSink::Event::OnImageViewOnMsg(_parent, logicalAddress);
                                 }
 
-                                void OnInActiveSource(const int logicalAddress, const string physicalAddress) override
+                                void OnInActiveSource(const int logicalAddress, string physicalAddress) override
                                 {
                                     LOGINFO("OnInActiveSource");
                                     LOGINFO("logicalAddress: %d, physicalAddress: %s", logicalAddress, physicalAddress.c_str());
-                                    Exchange::JHdmiCecSink::Event::OnInActiveSource(_parent, logicalAddress, physicalAddress);
+                                    Exchange::JHdmiCecSink::Event::OnInActiveSource(_parent, logicalAddress, std::move(physicalAddress));
                                 }
 
                                 void OnTextViewOnMsg(const int logicalAddress) override
@@ -159,11 +159,11 @@ namespace WPEFramework {
                                     Exchange::JHdmiCecSink::Event::OnWakeupFromStandby(_parent, logicalAddress);
                                 }
 
-                                void ReportAudioDeviceConnectedStatus(const string status, const string audioDeviceConnected) override
+                                void ReportAudioDeviceConnectedStatus(string status, string audioDeviceConnected) override
                                 {
                                     LOGINFO("ReportAudioDeviceConnectedStatus");
                                     LOGINFO("status: %s, audioDeviceConnected: %s", status.c_str(), audioDeviceConnected.c_str());
-                                    Exchange::JHdmiCecSink::Event::ReportAudioDeviceConnectedStatus(_parent, status, audioDeviceConnected);
+                                    Exchange::JHdmiCecSink::Event::ReportAudioDeviceConnectedStatus(_parent, std::move(status), std::move(audioDeviceConnected));
                                 }
 
                                 void ReportAudioStatusEvent(const int muteStatus, const int volumeLevel) override
@@ -180,18 +180,18 @@ namespace WPEFramework {
                                     Exchange::JHdmiCecSink::Event::ReportFeatureAbortEvent(_parent, logicalAddress, opcode, FeatureAbortReason);
                                 }
 
-                                void ReportCecEnabledEvent(const string cecEnable) override
+                                void ReportCecEnabledEvent(string cecEnable) override
                                 {
                                     LOGINFO("ReportCecEnabledEvent");
                                     LOGINFO("cecEnable: %s", cecEnable.c_str());
-                                    Exchange::JHdmiCecSink::Event::ReportCecEnabledEvent(_parent, cecEnable);
+                                    Exchange::JHdmiCecSink::Event::ReportCecEnabledEvent(_parent, std::move(cecEnable));
                                 }
 
-                                void SetSystemAudioModeEvent(const string audioMode) override
+                                void SetSystemAudioModeEvent(string audioMode) override
                                 {
                                     LOGINFO("SetSystemAudioModeEvent");
                                     LOGINFO("audioMode: %s", audioMode.c_str());
-                                    Exchange::JHdmiCecSink::Event::SetSystemAudioModeEvent(_parent, audioMode);
+                                    Exchange::JHdmiCecSink::Event::SetSystemAudioModeEvent(_parent, std::move(audioMode));
                                 }
 
                                 void ShortAudiodescriptorEvent(const string& shortAudioDescriptor) override

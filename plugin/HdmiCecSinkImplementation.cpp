@@ -3654,6 +3654,7 @@ namespace WPEFramework
           }
       else {
          LOGINFO("Error while fetching CEC Version from RFC ");
+		 LOGINFO("Failure occured from RFC while fetching CEC Version");
       }
       }
 

@@ -477,6 +477,8 @@ namespace WPEFramework
 
                         /* Using std::move on variables passed to reportFeatureAbortEvent is ineffective since reportFeatureAbortEvent takes const reference parameters */
                         /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
+                        /* logicaladdress is fully initialized by LogicalAddress::LogicalAddress(int); the constructor body lives in the external ccec library and is not visible to Coverity, which conservatively reports the copy below as using an uninitialized "impl" member */
+                        /* coverity[uninit_use_in_call : FALSE] */
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
                          if(msg.feature.opCode() == REQUEST_SHORT_AUDIO_DESCRIPTOR)
@@ -497,6 +499,8 @@ namespace WPEFramework
                 OpCode feature = msg.opCode();
                 /* Using std::move on variables passed to sendFeatureAbort is ineffective since sendFeatureAbort takes const reference parameters */
                 /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
+                /* logicaladdress and reason are fully initialized by the LogicalAddress(int) / AbortReason(enum) converting constructors defined in the external ccec library; those bodies are not visible to Coverity, which conservatively reports the copy below as using an uninitialized "impl" member */
+                /* coverity[uninit_use_in_call : FALSE] */
                 HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else

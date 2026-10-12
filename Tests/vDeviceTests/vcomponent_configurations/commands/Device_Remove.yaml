@@ -1,0 +1,72 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# Drops one HDMI-CEC peer from the vComponent's device map at run time. This document is
+# the third leg of the add / mutate / remove triple: Device_Add.yaml attaches the peer,
+# Device_Status.yaml mutates it, and this one takes it away. All three name
+# "GameConsole", and the name has to change in all three at once or the removal addresses a
+# peer that is not in the map - which the vComponent does not reject, it simply has no
+# effect. "GameConsole" is NOT declared in Device_Config_Add_Network.yaml: that document
+# declares exactly six peers, SAMSUNG, YAMAHA, DENON, PANASONIC, LG and SONY beneath VTV,
+# and leaves port 4 of the audio system free for this triple. Neither a "CECAdapter" nor a
+# "GameConsole" appears in that document, so the name cannot collide with a declared peer.
+#
+# The filename is part of the contract rather than a label: utils.HDMICEC_CMD_BASE
+# resolves to this directory and a consumer posts the literal "Device_Remove.yaml" joined
+# onto it - the suite this tree was modelled on does exactly that from two of its
+# scenarios. A renamed document does not fail loudly; the post comes back not-found and
+# the step is silently skipped, costing coverage with nothing to show for it. utils.py
+# also refuses a symbolic link, a path outside this configuration tree, and anything that
+# is not a regular file, so the document has to be a plain file living here under this
+# exact name.
+#
+# Nothing below is role-inverted, and that is what separates this document from the
+# Device_Add.yaml it is paired with. That one had to re-parent its peer for the sink,
+# because the source plugin's suite roots its map at an emulated television while
+# here the device under test is itself the television. A removal names only the peer,
+# and "GameConsole" is already a source-role PlaybackDevice in both topologies, so the
+# body carries over from the source plugin's document unchanged.
+#
+# What this drives on the sink side: HdmiCecSinkImplementation::removeDevice() clears the
+# deviceList entry, decrements the device count, and fans OnDeviceRemoved out to every
+# registered notification, which HdmiCecSink.h forwards as the plugin's onDeviceRemoved
+# event. COVERAGE_GAPS.md lists both as zero-hit in its PRE-CHANGE BASELINE - that is the
+# state the register recorded, not the state of the delivered suite, where the sink L1 and L2
+# suites both exercise removeDevice and the onDeviceRemoved event. A third path is reached
+# from here for the same reason: because the peer is nested one level below an HDMI port
+# rather than sitting directly on one, removeDevice() also calls HdmiPortMap::removeChild for
+# whichever input matches the departing peer's physical address - and that inner arm needs a
+# non-zero second address byte, which only a nested peer has. The audio-system
+# branch is not this document's; removeDevice() special-cases logical address 5, which
+# belongs to the root audio system.
+#
+# Two preconditions are deliberately NOT encoded here, because a static fixture cannot
+# express either. removeDevice() returns early while m_logicalAddressAllocated is
+# LogicalAddress::UNREGISTERED, and it does nothing at all unless the peer's
+# m_isDevicePresent is already set - so the plugin must have been enabled and have
+# claimed its logical address, and the peer must already be in the map, before this
+# document is posted, or the OnDeviceRemoved notification never fires.
+# Init_Devicelist_Populate.py owns the enable and the polling; the ordering within a
+# scenario belongs to the test-case module.
+HdmiCec:
+  command: remove_device
+  description: Remove an HDMI CEC device from the device map
+  device:
+    name: "GameConsole"

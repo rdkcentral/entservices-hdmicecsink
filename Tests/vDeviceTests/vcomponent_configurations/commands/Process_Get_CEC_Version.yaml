@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Trigger process(GetCECVersion)
+  message:
+    user_defined: true
+    payload: ["0x40", "0x9F"]

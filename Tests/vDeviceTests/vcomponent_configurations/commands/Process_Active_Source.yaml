@@ -1,0 +1,14 @@
+HdmiCec:
+  command: cec_message
+  description: Trigger process(ActiveSource) - SONY (LA=4) claims the bus from 3.0.0.0
+  message:
+    user_defined: true
+    # 0x4F  header: initiator 4 (SONY, Playback Device 1), destination 0xF (broadcast).
+    #       process(ActiveSource) returns early on a directed frame (cpp:152-160).
+    # 0x82  opcode <Active Source>.
+    # 0x30, 0x00  physical address 3.0.0.0 - SONY's OWN address, as
+    #       Device_Config_Add_Network.yaml allocates it. An <Active Source> operand is not
+    #       decorative: updateActiveSource writes it into deviceList[4].m_physicalAddr and then
+    #       sets m_currentActiveSource to 4, so an operand naming a different peer's address MOVES
+    #       SONY there and corrupts every subsequent route and getDeviceList answer.
+    payload: ["0x4F", "0x82", "0x30", "0x00"]

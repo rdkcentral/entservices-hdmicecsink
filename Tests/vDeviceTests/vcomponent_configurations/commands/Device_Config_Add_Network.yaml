@@ -1,0 +1,242 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# THE ONE AUTHORITATIVE TOPOLOGY for the sink vDevice suite. Every other document in this tree is
+# written against the addresses derived below; nothing here is decorative.
+#
+# Init_Devicelist_Populate.py posts this document as its FIRST configuration action
+# (NETWORK_CONFIG_YAML), before it enables HDMI-CEC and starts polling getDeviceList, so every
+# later fixture inherits the topology declared here. The filename is part of that contract: the
+# module joins this exact name onto utils.HDMICEC_CMD_BASE and treats any reply other than HTTP 200
+# as a rejection, so a renamed document does not fail loudly - it leaves the suite with no devices.
+#
+# THE ROOT IS THE DEVICE UNDER TEST, AND IT IS A TELEVISION.
+# config.emulated_device names the identity the vComponent's HAL presents for the sink itself.
+# HdmiCecSinkImplementation::allocateLAforTV() claims LogicalAddress::TV, and
+# HdmiCecAddLogicalAddress accepts that claim ONLY when the emulated device is a TV and the address
+# is 0 (rdk-halif-test-hdmi_cec/vcomponent/src/vcHdmiCec.c:833-853); HdmiCecTx and HdmiCecTxAsync
+# then refuse to transmit while a TV still holds 0x0F (:959, :995). HdmiCecOpen additionally pins a
+# TV emulated device to physical address 0.0.0.0 (:770-775), which is the address the sink reports
+# for itself. Rooting this map at an AudioSystem, as it once was, leaves the sink unable to register
+# its logical address and unable to send a single frame.
+#
+# THAT IS NOT ROLE INVERSION. No emulated peer is reconfigured to stand in for the device under
+# test, and no peer takes the television role: the sink IS the television, and this document says
+# so once. EVERY PEER IS SOURCE-ROLE - the device_type values below are limited to AudioSystem,
+# PlaybackDevice, RecordingDevice and Tuner.
+#
+# HOW THE ADDRESSES BELOW ARE DERIVED, AND WHY DECLARATION ORDER IS LOAD-BEARING.
+# vcDevice_InsertChild PREPENDS each child (vcDevice.c:224-231), so a sibling chain is walked in
+# REVERSE declaration order; vcDevice_AllocatePhysicalLogicalAddresses then visits a node, then its
+# siblings, and only afterwards their children (:382-383). Logical addresses come from
+# vcDevice_AllocateLogicalAddress, which hands out the first FREE address of the node's device-type
+# pool (:386-437): TV [0,14], RecordingDevice [1,2,9], Tuner [3,6,7,10], PlaybackDevice [4,8,11],
+# AudioSystem [5]. Physical addresses substitute the child's port_id into the first zero nibble of
+# the parent's address (:349-365) - which is also why NO CHILD MAY CARRY port_id 0: it would leave
+# the child sharing its parent's address.
+#
+# The peers below are declared in port order for reading, so the visit order is SONY, YAMAHA,
+# SAMSUNG and then the three nested peers DENON, PANASONIC, LG. That makes the allocation fully
+# determined:
+#
+#   peer       device_type      parent  port  physical  logical  CEC family        HDMI input
+#   ---------  ---------------  ------  ----  --------  -------  ----------------  ----------
+#   SAMSUNG    Tuner            VTV      1    1.0.0.0      3     TUNER1                0
+#   YAMAHA     AudioSystem      VTV      2    2.0.0.0      5     AUDIOSYSTEM           1
+#   SONY       PlaybackDevice   VTV      3    3.0.0.0      4     PLAYBACKDEVICE1       2
+#   DENON      RecordingDevice  YAMAHA   1    2.1.0.0      1     RECORDINGDEVICE1      1
+#   PANASONIC  PlaybackDevice   YAMAHA   2    2.2.0.0      8     PLAYBACKDEVICE2       1
+#   LG         RecordingDevice  YAMAHA   3    2.3.0.0      2     RECORDINGDEVICE2      1
+#
+# Every address above is canonical for its device type, as
+# hdmicec/ccec/include/ccec/Operands.hpp LogicalAddress::getType() defines it: 1 and 2 are
+# recording devices, 3 is a tuner, 4 and 8 are playback devices, 5 is the audio system. And no peer
+# is left LOGICAL_ADDRESS_UNREGISTERED - a device type whose pool is exhausted is allocated 15,
+# which would put two peers on the broadcast address.
+#
+# Two orderings are deliberate rather than incidental:
+#   * Among YAMAHA's children DENON is declared LAST so it is visited FIRST and takes
+#     RECORDINGDEVICE1, while LG is declared first, visited last, and takes RECORDINGDEVICE2.
+#     Swapping their declaration order swaps their addresses.
+#   * The nested peers are visited only after every root-level peer, so SONY holds
+#     PLAYBACKDEVICE1 and PANASONIC takes PLAYBACKDEVICE2 rather than the two competing for it.
+#
+# WHY THE AUDIO SYSTEM IS ON PORT 2, AND WHY THAT IS NOT INTERCHANGEABLE.
+# process(const InitiateArc &, const Header &) derives the ARC port's physical
+# address from HdmiArcPortID - 0 gives 1.0.0.0, 1 gives 2.0.0.0, 2 gives 3.0.0.0, anything else
+# leaves it at the invalid sentinel 15.15.15.15 - and proceeds to Process_InitiateArc() only when
+# deviceList[0x5].m_physicalAddr matches that address or is itself the sentinel. This suite seeds
+# the audio system's physical address explicitly, so the sentinel escape does not apply: an audio
+# system at the wrong address makes the sink's ARC initiation path structurally unreachable and
+# every ARC fixture in this tree a silent no-op. Port 2 is not a guess - the suite states its own
+# platform in both of its GoogleTest suites, the sink L1 and the sink L2, each stubbing
+# device::HdmiInput::getHDMIARCPortId to 1 and reporting only port 1 connected. HDMI input 1 is physical address 2.0.0.0, because the sink matches a peer to an input
+# by comparing the address's first nibble against m_portID + 1.
+#
+# WHY THREE PEERS ARE NESTED UNDER THE AUDIO SYSTEM RATHER THAN GIVEN THEIR OWN TV PORTS.
+# updateDeviceChain and getActiveRoute both admit a peer into the
+# sink's HdmiPortMap only when the first nibble of its physical address equals some
+# hdmiInputs[i].m_portID + 1 for i < m_numofHdmiInput. A peer at 4.0.0.0 or 5.0.0.0 is discoverable
+# through getDeviceList but never enters the port map on a three-input television, so its route can
+# never resolve. Nesting keeps all six peers inside 1.x, 2.x and 3.x, and gives
+# HdmiPortMap::addChild and HdmiPortMap::getRoute both a one-hop chain to walk - SONY, directly on
+# a television port - and a two-hop chain, the three peers behind the audio receiver.
+#
+# WHAT ELSE MOVES WITH THIS TABLE. The same six addresses are hard-wired into:
+#   * ../../Init_Devicelist_Populate.py            PEER_SEEDS and BOOTSTRAP_LOGICAL_ADDRESS
+#   * DeviceListConfig/Payload_*_<VENDOR>.yaml     frame headers, physical-address and device-type
+#                                                  operands for each peer's announcements
+#   * Process_*.yaml and Device_*.yaml             initiator headers and physical-address operands
+#   * ../hdmicec/hdmicec_vcomponent_configuration.yaml   the DUT identity
+#   * Device_Config.yaml                           the two-device subset of this network
+# A peer renamed, re-typed or re-ported here without the same change there leaves two documents
+# describing different devices at the same address. The trap is not theoretical: an <Active Source>
+# or <Report Physical Address> operand is written straight into deviceList[la].m_physicalAddr
+# (process(const ReportPhysicalAddress &, const Header &) and updateActiveSource), so a stale
+# operand does not merely read wrong - it MOVES the
+# peer, and moving the audio system disables ARC.
+#
+# THE AUDIO SYSTEM IS LOAD-BEARING IN A SECOND WAY. The vComponent offers an audio system exactly
+# one logical address, and address 5 is the only address for which
+# HdmiCecSinkImplementation::addDevice() additionally raises ReportAudioDeviceConnectedStatus,
+# which is what makes the System Audio Mode and short-audio-descriptor flows observable at all.
+# That is why Init_Devicelist_Populate.py declares discovery ready on address 5 specifically rather
+# than on whichever peer answers first.
+#
+# YAMAHA'S PORT 4 IS DELIBERATELY LEFT FREE. Device_Add.yaml adds a PlaybackDevice beneath the
+# audio system on port 4 at runtime; it lands at 2.4.0.0 and takes PLAYBACKDEVICE3 (11) because 4
+# and 8 are held above, and it is absent from this map on purpose so that the add is a real
+# population change rather than a no-op. Parenting the add under the audio system also keeps it
+# clear of the free-port guard in HandleStateMessages (vcHdmiCec.c:274-282), which applies only
+# when the parent IS the emulated television and would refuse the add once the root's
+# number_children reached number_of_ports.
+HdmiCec:
+  command: configure
+  description: Initialize HDMI CEC device map
+  config:
+    emulated_device:
+      name: "VTV"
+      language: "eng"
+      cec_version: "1.4"
+      device_type: "TV"
+      power_status: "on"
+      port_id: 0
+      fault: no
+      number_of_ports: 3
+      active_source: false
+    device_map:
+      - device:
+          name: "VTV"
+          language: "eng"
+          cec_version: "1.4"
+          device_type: "TV"
+          power_status: "on"
+          fault: no
+          port_id: 0
+          number_of_ports: 3
+          active_source: false
+          children:
+            # HDMI input 0 -> physical address 1.0.0.0, logical address TUNER1 (3).
+            - device:
+                name: "SAMSUNG"
+                language: "eng"
+                cec_version: "1.4"
+                device_type: "Tuner"
+                power_status: "on"
+                fault: no
+                port_id: 1
+                number_of_ports: 0
+                active_source: false
+                children: []
+            # HDMI input 1 -> physical address 2.0.0.0, logical address AUDIOSYSTEM (5): the ARC
+            # counterpart of the sink, the peer the suite bootstraps on, and the only address at
+            # which process(InitiateArc) will accept an audio system whose address is known.
+            # Declares four ports - three occupied below, the fourth reserved for Device_Add.yaml.
+            - device:
+                name: "YAMAHA"
+                language: "eng"
+                cec_version: "1.4"
+                # AudioSystem, and it has to be. Address 5 is the ONLY audio-system address the
+                # vComponent allocates, and it is the only address for which the sink's
+                # addDevice() additionally raises ReportAudioDeviceConnectedStatus - which is what
+                # makes the ARC, System Audio Mode and short-audio-descriptor flows observable at
+                # all. Declaring this peer a Tuner instead would allocate it from the tuner pool
+                # (3, 6, 7, 10), leaving 3 to SAMSUNG and 6 to this device, so address 5 would be
+                # unoccupied and Init_Devicelist_Populate's bootstrap - which declares discovery
+                # ready on address 5 - could never complete. This peer IS the topology's audio
+                # system; there is no second audio-system device anywhere in it.
+                device_type: "AudioSystem"
+                power_status: "on"
+                fault: no
+                port_id: 2
+                number_of_ports: 4
+                active_source: false
+                children:
+                  # Declared first, visited last among the recorders, so RECORDINGDEVICE2 (2).
+                  - device:
+                      name: "LG"
+                      language: "eng"
+                      cec_version: "1.4"
+                      device_type: "RecordingDevice"
+                      power_status: "on"
+                      fault: no
+                      port_id: 3
+                      number_of_ports: 0
+                      active_source: false
+                      children: []
+                  # Second playback peer, so a route change has somewhere to go: PLAYBACKDEVICE2
+                  # (8) at 2.2.0.0, two hops from the television.
+                  - device:
+                      name: "PANASONIC"
+                      language: "eng"
+                      cec_version: "1.4"
+                      device_type: "PlaybackDevice"
+                      power_status: "standby"
+                      fault: no
+                      port_id: 2
+                      number_of_ports: 0
+                      active_source: false
+                      children: []
+                  # Declared last, visited first among the recorders, so RECORDINGDEVICE1 (1).
+                  - device:
+                      name: "DENON"
+                      language: "eng"
+                      cec_version: "1.4"
+                      device_type: "RecordingDevice"
+                      power_status: "on"
+                      fault: no
+                      port_id: 1
+                      number_of_ports: 0
+                      active_source: false
+                      children: []
+            # HDMI input 2 -> physical address 3.0.0.0, logical address PLAYBACKDEVICE1 (4). The
+            # active-source candidate the routing flows switch to, and exactly one device in the
+            # tree is the active source, as the middleware expects.
+            - device:
+                name: "SONY"
+                language: "eng"
+                cec_version: "1.4"
+                device_type: "PlaybackDevice"
+                power_status: "on"
+                fault: no
+                port_id: 3
+                number_of_ports: 0
+                active_source: true
+                children: []

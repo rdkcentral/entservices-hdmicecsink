@@ -1,0 +1,8 @@
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(SetOSDName) from SONY (LA=4) - OSD name 'SONY'"
+  message:
+    user_defined: true
+    # Header 0x40: initiator=4 (SONY, Playback Device 1), destination=0 (sink DUT, directed)
+    # Opcode 0x47: SetOSDName  "SONY" = 0x53 0x4F 0x4E 0x59
+    payload: ["0x40", "0x47", "0x53", "0x4F", "0x4E", "0x59"]

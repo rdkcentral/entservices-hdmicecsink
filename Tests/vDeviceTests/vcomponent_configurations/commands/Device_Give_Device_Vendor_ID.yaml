@@ -1,0 +1,28 @@
+# A DIRECTED REQUEST FROM THE AUDIO SYSTEM TO THE DEVICE UNDER TEST. It asks the television for
+# its own vendor identifier, and it exercises the SINK'S RESPONDER PATH -
+# HdmiCecSinkProcessor::process(GiveDeviceVendorID) at
+# HdmiCecSinkImplementation.cpp:277-293 - which is the only thing a frame in this direction can do.
+#
+# IT CANNOT BE USED TO POPULATE A PEER, and that is worth stating because it once was. Posting this
+# document does not teach the sink anything about logical address 5: the sink is the RESPONDENT
+# here, and its reply carries the sink's OWN appVendorId, the vendor identifier the plugin holds
+# for itself. The document that populates address 5 is
+# DeviceListConfig/Payload_Vendor_ID_YAMAHA.yaml, a
+# peer-originated announcement travelling the other way, which process(DeviceVendorID) records
+# against deviceList[5]. Anything that treats this request as a seeding fallback will find address
+# 5 no more present after the post than before it, while every post returns HTTP 200.
+#
+# Payload, byte by byte:
+#   0x50  header = (initiator << 4) | destination = (AUDIOSYSTEM 5 << 4) | TV 0. Logical address 5
+#         is the audio-system peer YAMAHA that Device_Config_Add_Network.yaml declares, and the
+#         television answers on LogicalAddress::TV == 0 as claimed by allocateLAforTV().
+#         DIRECTED is required, not stylistic: the handler discards broadcast outright and then
+#         replies with a BROADCAST <Device Vendor ID>, which is also why the response row for
+#         this exchange in ../hdmicec/hdmicec_vcomponent_cec_responses.yaml is Broadcast.
+#   0x8C  GIVE_DEVICE_VENDOR_ID.
+HdmiCec:
+  command: cec_message
+  description: Inject GiveDeviceVendorId - YAMAHA (LA=5) asks the sink for its own vendor identifier
+  message:
+    user_defined: true
+    payload: ["0x50", "0x8C"]

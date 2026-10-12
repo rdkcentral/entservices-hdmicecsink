@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Inject CECVersion
+  message:
+    user_defined: true
+    payload: ["0x50", "0x9E", "0x05"]

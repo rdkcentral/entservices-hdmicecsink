@@ -1,0 +1,74 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2025 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# THE EMULATED DEVICE IS THE DEVICE UNDER TEST ITSELF, NOT A PEER.
+#
+# The vComponent replaces the HDMI-CEC HAL beneath the sink plugin, and the block below declares
+# the identity that HAL presents for the DUT. It carries the same key set as the source plugin's
+# profile document, which this one is modelled on byte for byte apart from the commentary: a name,
+# the four identity fields, the fault flag and the controller port. HdmiCecOpen resolves the
+# emulated device BY NAME against the configured device map - "VTV" here has to be the name the
+# ../commands/Device_Config*.yaml documents give the root node - and then, for a TV, fixes physical
+# address 0.0.0.0 and leaves the logical address at 0x0F for the application to claim
+# (rdk-halif-test-hdmi_cec/vcomponent/src/vcHdmiCec.c:726, :747, :770-775).
+#
+# device_type MUST BE "TV", and that is a HAL requirement rather than a preference.
+# HdmiCecSinkImplementation::allocateLAforTV() claims LogicalAddress::TV for the sink, and
+# HdmiCecAddLogicalAddress rejects the request outright unless the emulated device is a TV AND the
+# address is 0 (vcHdmiCec.c:833-853). HdmiCecTx and HdmiCecTxAsync then refuse to transmit while a
+# TV still holds 0x0F (:959, :995). Declaring the DUT as an AudioSystem therefore leaves it unable
+# to register its address and unable to send a single frame - every test case downstream fails for
+# a reason that has nothing to do with the case.
+#
+# Declaring the DUT as a TV IS NOT ROLE INVERSION. Nothing here reconfigures the device under test
+# to stand in for one of its own peers: the sink IS the television, and this is the document that
+# says so. The emulated PEERS remain source-role throughout - see
+# ../commands/Device_Config_Add_Network.yaml, whose device_type values are limited to
+# AudioSystem, PlaybackDevice, RecordingDevice and Tuner.
+#
+# THE AUDIO SYSTEM IS A CHILD PEER, AT LOGICAL ADDRESS 5 AND PHYSICAL ADDRESS 2.0.0.0.
+# vcDevice_AllocateLogicalAddress offers an audio system exactly one candidate,
+# LOGICAL_ADDRESS_AUDIOSYSTEM == 5, and address 5 is the only one for which
+# HdmiCecSinkImplementation::addDevice() additionally raises ReportAudioDeviceConnectedStatus -
+# which is what makes the System Audio Mode and short-audio-descriptor flows observable at all.
+# process(InitiateArc) (HdmiCecSinkImplementation.cpp:508-534) constrains the physical address too:
+# it derives the ARC port's address from HdmiArcPortID - 0 gives 1.0.0.0, 1 gives 2.0.0.0, 2 gives
+# 3.0.0.0 - and engages the ARC path only when deviceList[0x5].m_physicalAddr matches it or is
+# still the unknown sentinel 15.15.15.15. Because this suite seeds that address explicitly, an
+# audio system anywhere else disables every ARC flow silently, so it is placed on HDMI input 1 -
+# the input this suite's own fixtures pin as the ARC port and the only one they report connected
+# (test_HdmiCecSink.cpp:857-868, HdmiCecSink_L2Test.cpp:1466-1479 and :1740-1751 all stub getHDMIARCPortId to 1).
+# That peer is declared as YAMAHA in ../commands/Device_Config.yaml and
+# ../commands/Device_Config_Add_Network.yaml, which are the documents a test case posts to
+# materialise the network; the directed exchanges in hdmicec_vcomponent_cec_responses.yaml and the
+# key-control commands in ../../HdmiCECSink_Curl.py are both written against logical address 5.
+# Those four documents move together: changing the audio system's identity in one without the
+# others breaks the pairing.
+HdmiCec:
+  name: "VTV"
+  language: "eng"
+  cec_version: "1.4"
+  device_type: "TV"
+  power_status: "on"
+  fault: no
+
+  controllers:
+    ut_controller_port: 8080

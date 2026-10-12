@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Inject SetMenuLanguage
+  message:
+    user_defined: true
+    payload: ["0x50", "0x32", "0x65", "0x6E", "0x67"]

@@ -550,6 +550,7 @@ jobs:
           sudo mkdir -p -m 777
           /tmp/test/testApp/etc/apps
           /opt/persistent
+          /opt/persistent/ds
           /opt/secure
           /opt/secure/reboot
           /opt/secure/persistent
@@ -568,12 +569,12 @@ jobs:
           /dev/disk/by-id
           /dev
           &&
-          if [ ! -f mknod /dev/sda c 240 0 ]; then mknod /dev/sda c 240 0; fi &&
-          if [ ! -f mknod /dev/sda1 c 240 0 ]; then mknod /dev/sda1 c 240 0; fi &&
-          if [ ! -f mknod /dev/sda2 c 240 0 ]; then mknod /dev/sda2 c 240 0; fi &&
-          if [ ! -f mknod /dev/sdb c 240 0 ]; then mknod /dev/sdb c 240 0; fi &&
-          if [ ! -f mknod /dev/sdb1 c 240 0 ]; then mknod /dev/sdb1 c 240 0; fi &&
-          if [ ! -f mknod /dev/sdb2 c 240 0 ]; then mknod /dev/sdb2 c 240 0; fi
+          if [ ! -e /dev/sda ]; then sudo mknod /dev/sda c 240 0; fi &&
+          if [ ! -e /dev/sda1 ]; then sudo mknod /dev/sda1 c 240 0; fi &&
+          if [ ! -e /dev/sda2 ]; then sudo mknod /dev/sda2 c 240 0; fi &&
+          if [ ! -e /dev/sdb ]; then sudo mknod /dev/sdb c 240 0; fi &&
+          if [ ! -e /dev/sdb1 ]; then sudo mknod /dev/sdb1 c 240 0; fi &&
+          if [ ! -e /dev/sdb2 ]; then sudo mknod /dev/sdb2 c 240 0; fi
           &&
           sudo touch
           /tmp/test/testApp/etc/apps/testApp_package.json
@@ -632,6 +633,7 @@ jobs:
 
       - name: Run unit tests without valgrind
         run: >
+          sudo -E env
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
           GTEST_OUTPUT="json:$(pwd)/rdkL1TestResults.json"
@@ -642,6 +644,7 @@ jobs:
       - name: Run unit tests with valgrind
         if: ${{ !env.ACT && inputs.caller_source != 'testframework' }}
         run: >
+          sudo -E env
           PATH=$GITHUB_WORKSPACE/install/usr/bin:${PATH}
           LD_LIBRARY_PATH=$GITHUB_WORKSPACE/install/usr/lib:$GITHUB_WORKSPACE/install/usr/lib/wpeframework/plugins:${LD_LIBRARY_PATH}
           GTEST_OUTPUT="json:$(pwd)/rdkL1TestResults.json"

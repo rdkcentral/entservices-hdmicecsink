@@ -1,0 +1,67 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# A single CEC frame injected onto the emulated bus: a <CEC Version> reply from the SAMSUNG tuner
+# to the television that is the device under test.
+#
+# RAW BYTES, NOT THE EMULATOR'S SYMBOLIC FORM, AND THAT IS NOT A STYLE CHOICE. A symbolic document
+# names an opcode and lets the emulator synthesise the bytes, but its command parser synthesises
+# operands for exactly three opcodes - CEC_ACTIVE_SOURCE and CEC_INACTIVE_SOURCE from the
+# initiator's own allocated physical address, and CEC_SET_OSD_NAME from an osd_name field
+# (rdk-halif-test-hdmi_cec/vcomponent/src/vcHdmiCec.c, ParseCommand). <CEC Version> is not among
+# them, so a symbolic form of this frame would go out as a bare header and opcode. That is not a
+# weaker test but an empty one: CECVersion's operand is the whole content of the message, so
+# process(const CECVersion &, const Header &) would have nothing to record.
+#
+# The symbolic path is in any case unreachable from every document in this tree on the vendored
+# emulator: ParseCommand resolves the opcode from the "hdmicec/command" field, every document here
+# sets that field to "cec_message", and "cec_message" is not a token in the emulator's opcode table
+# (vcCommand.c, gOpCodeStrVal), so the symbolic branch rejects the opcode before the operand code is
+# reached. Raw bytes are also the only form that cannot omit an operand by accident, whichever
+# emulator generation is in front of them.
+#
+# NOT A DUPLICATE OF Device_CEC_Version.yaml. That document is the audio system's reply, from
+# logical address 5. This one is the tuner's, from logical address 3, which keeps a second peer's
+# version exercisable. process(const CECVersion &, const Header &) calls addDevice(header.from) and
+# then deviceList[3].update(msg.version), so the two documents drive the same handler for two
+# different entries in the device list.
+#
+# Payload, byte by byte:
+#   0x30  header = (initiator << 4) | destination = (TUNER1 3 << 4) | TV 0. SAMSUNG is logical
+#         address 3 at physical address 1.0.0.0 in Device_Config_Add_Network.yaml, and the
+#         television answers on LogicalAddress::TV == 0, claimed by allocateLAforTV(). Directed
+#         rather than broadcast because <CEC Version> is the reply to a <Get CEC Version> request
+#         addressed to a device; process(CECVersion) is the one handler in this family that guards
+#         neither direction, which is why the addressing has to be right in the document.
+#   0x9E  CEC_VERSION.
+#   0x05  Version::V_1_4 (Operands.hpp Version). Version::toString renders it "Version 1.4", which
+#         is the value getDeviceList reports as this peer's cecVersion, and it agrees with the
+#         cec_version: "1.4" that Device_Config_Add_Network.yaml declares for SAMSUNG.
+#
+# The filename is part of the contract. utils.HDMICEC_CMD_BASE resolves to this directory, so a
+# test case posts the bare name "Device_CEC_Message.yaml" against it; note the upper-case CEC and
+# the distinction from Device_CEC_Message_Userdef.yaml, which injects an <Active Source>. A
+# mismatch returns not-found and disables that step of the case without failing it.
+HdmiCec:
+  command: cec_message
+  description: Inject CECVersion (CEC opcode 0x9E) - SAMSUNG (LA=3) reports CEC 1.4 to the sink
+  message:
+    user_defined: true
+    payload: ["0x30", "0x9E", "0x05"]

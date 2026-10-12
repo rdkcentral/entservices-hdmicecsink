@@ -1,0 +1,46 @@
+# Device_Report_Power_Status.yaml
+#
+# The audio system's <Report Power Status> answer, injected as a raw CEC frame.
+#
+# PAYLOAD, BYTE BY BYTE
+#   0x50  header - initiator 5 (the AudioSystem in the seeded topology) DIRECTED to destination 0
+#         (the television). Directed, not broadcast, because
+#         HdmiCecSinkProcessor::process(const ReportPowerStatus&, const Header&) returns
+#         immediately on a broadcast destination (HdmiCecSinkImplementation.cpp:411-415), so a
+#         broadcast frame would be accepted by the emulator and then discarded unread.
+#   0x90  opcode <Report Power Status>.
+#   0x01  the single [Power Status] operand. 0x01 is STANDBY - PowerStatus::toString() renders the
+#         operand through the table at ccec/include/ccec/Operands.hpp:596-601, where index 0 is
+#         "On" and index 1 is "Standby".
+#
+# WHY THE OPERAND MUST BE 0x01 AND NOT 0x00. The value has to DIFFER
+# from the sink's default for the assertion built on it to mean anything. CECDeviceParams()
+# initialises m_powerStatus to 0 and clear() resets it to 0 (HdmiCecSinkImplementation.h:150, :173),
+# and both render "On" - so a fixture carrying 0x00 produced a published powerStatus of "On" that
+# was indistinguishable from a frame that never arrived at all. A case asserting it could not tell
+# a processed report from an untouched default.
+#
+# 0x01 makes the observation a TRANSITION: the record must move from "On" to "Standby", which only
+# a delivered and decoded frame can do. It also drives a branch in the handler that 0x00 could never
+# reach - process(const ReportPowerStatus &, const Header &) compares the old and new values and
+# calls sendDeviceUpdateInfo() only when they differ, and with 0x00 against a default of 0 they
+# never differ.
+#
+# CONSUMER, AND WHY NO PYTHON EDIT ACCOMPANIES THIS ONE. TCID24_Audio_Status_And_Power_Flow DERIVES
+# its expected powerStatus string by reading this operand byte out of this document rather than
+# restating it, so the expectation follows the fixture automatically. Do not add or remove payload
+# bytes: ReportPowerStatus decodes exactly one operand, and the module additionally requires this
+# document to declare at least three payload bytes initiated from address 5.
+#
+# RESIDUAL STATE, DECLARED. After this frame is injected the sink publishes "Standby" as the audio
+# system's powerStatus until another <Report Power Status> from address 5 replaces it. That residual
+# is deterministic and no other case in this suite asserts a value for that field, so nothing
+# downstream reads it. Restoring it would take a second document for the same address carrying
+# operand 0x00; none is provided because no case needs one, and a case that ever does should add
+# it rather than repurpose this document.
+HdmiCec:
+  command: cec_message
+  description: Inject ReportPowerStatus - audio system reports STANDBY (operand 0x01)
+  message:
+    user_defined: true
+    payload: ["0x50", "0x90", "0x01"]

@@ -1,0 +1,4 @@
+HdmiCec:
+  command: update_bus_status
+  description: Emulate logical-address setup failure by forcing a busy bus state
+  status: "busy"

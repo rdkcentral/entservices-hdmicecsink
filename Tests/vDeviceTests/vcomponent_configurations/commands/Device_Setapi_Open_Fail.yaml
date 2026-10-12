@@ -1,0 +1,14 @@
+HdmiCec:
+  command: update_device_status
+  description: Emulate HAL open failure by marking the target as faulted
+  device:
+    # name is the EMULATED DEVICE - the device under test itself, not a peer. This document
+    # injects a HAL fault into the CEC adapter the sink plugin opens, so it has to name the
+    # identity config.emulated_device pins in Device_Config.yaml,
+    # Device_Config_Add_Network.yaml and ../hdmicec/hdmicec_vcomponent_configuration.yaml, which
+    # is the television VTV. It named an audio system while the map was wrongly rooted at one; a
+    # name absent from the device map resolves to nothing and the fault is never injected, which
+    # the vComponent reports as success.
+    name: "VTV"
+    power_status: "on"
+    fault: yes

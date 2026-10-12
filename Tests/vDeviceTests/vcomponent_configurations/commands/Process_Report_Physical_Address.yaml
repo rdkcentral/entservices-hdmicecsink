@@ -1,0 +1,15 @@
+HdmiCec:
+  command: cec_message
+  description: Trigger process(ReportPhysicalAddress) - SONY (LA=4, Playback Device) at 3.0.0.0
+  message:
+    user_defined: true
+    # 0x4F  header: initiator 4 (SONY), destination 0xF (broadcast). process(ReportPhysicalAddress)
+    #       discards directed frames (cpp:351-353).
+    # 0x84  opcode <Report Physical Address>.
+    # 0x30, 0x00  physical address 3.0.0.0, SONY's own address in
+    #       Device_Config_Add_Network.yaml. Written verbatim into deviceList[4].m_physicalAddr
+    #       (cpp:366) and fed to updateDeviceChain, which places the peer on the HDMI input whose
+    #       m_portID + 1 equals the first nibble - input 2 for this address.
+    # 0x04  device type Playback Device, the family logical address 4 belongs to
+    #       (Operands.hpp LogicalAddress::getType).
+    payload: ["0x4F", "0x84", "0x30", "0x00", "0x04"]

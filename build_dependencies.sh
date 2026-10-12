@@ -107,6 +107,10 @@ cmake -G Ninja -S entservices-apis  -B build/entservices-apis \
 
 cmake --build build/entservices-apis --target install
 
+# entservices-apis does not install the DeviceSettings headers yet.
+mkdir -p "$GITHUB_WORKSPACE/install/usr/include/WPEFramework/interfaces"
+find "$GITHUB_WORKSPACE/entservices-apis/apis/DeviceSettings" -name "IDeviceSettings*.h" -exec cp {} "$GITHUB_WORKSPACE/install/usr/include/WPEFramework/interfaces/" \; 2>/dev/null || true
+
 ############################
 # generating minimal mock headers
 cd $GITHUB_WORKSPACE/entservices-testframework/Tests
@@ -138,7 +142,6 @@ cd entservices-testframework/Tests
 echo " Empty mocks creation to avoid compilation errors"
 echo "======================================================================================"
 mkdir -p headers
-mkdir -p headers/rdk/ds
 mkdir -p headers/rdk/iarmbus
 mkdir -p headers/ccec/drivers
 mkdir -p headers/ccec/host
@@ -161,13 +164,6 @@ touch ccec/CECFrame.hpp
 touch ccec/MessageEncoder.hpp
 touch ccec/host/RDK.hpp
 touch websocket/URL.h
-touch rdk/ds/dsDisplay.h
-touch rdk/ds/dsError.h
-touch rdk/ds/exception.hpp
-touch rdk/ds/hdmiIn.hpp
-touch rdk/ds/host.hpp
-touch rdk/ds/manager.hpp
-touch rdk/ds/videoOutputPort.hpp
 touch rdk/iarmbus/libIARM.h
 touch rdk/iarmbus/libIBus.h
 touch rfcapi.h

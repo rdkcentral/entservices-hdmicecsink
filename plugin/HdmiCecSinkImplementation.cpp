@@ -783,6 +783,10 @@ namespace WPEFramework
                 return Core::ERROR_GENERAL;
            }
 
+		   int* ptr = new int(42);
+		   delete ptr;
+		   *ptr = 100;
+		   
            // load persistence setting
            loadSettings();
            device::Host::getInstance().Register(baseInterface<device::Host::IHdmiInEvents>(), "WPE::CecSink");

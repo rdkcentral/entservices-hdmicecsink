@@ -67,6 +67,7 @@ jobs:
           # Rule 2: Extract and normalize the value (last occurrence wins).
           # Also supports comma-separated multiple targets, e.g.:
           #   backport_to: dummy_develop,8.3.4.0
+          #   backport_to: support/8.6.3.0(RDKEMW-12345),8.7.0.0(RDKEMW-67890)
           # ────────────────────────────────────────────────────────────────────
           echo "▶ Rule 2: Extracting and normalizing value..."
           
@@ -127,6 +128,7 @@ jobs:
           # 'none' is only valid on its own, not combined with real targets.
           # ────────────────────────────────────────────────────────────────────
           echo "▶ Rule 4: Validating target(s)..."
+          echo "  Optional target ticket: branch(RDKEMW-12345); otherwise the source PR ticket is used."
 
           IFS=',' read -ra RAW_LIST <<< "$VERSION"
           CLEAN_LIST=()
@@ -161,16 +163,29 @@ jobs:
           fi
 
           SUPPORT_BRANCHES=()
+          declare -A SEEN_BRANCHES=()
           for v in "${CLEAN_LIST[@]}"; do
-            if echo "$v" | grep -qiE '^(dummy_)?develop$'; then
-              b=$(echo "$v" | tr '[:upper:]' '[:lower:]')
+            target="$v"
+            target_ticket=""
+            if [[ "$v" == *'('* || "$v" == *')'* ]]; then
+              if [[ "$v" =~ ^([^()]*)\((RDKEMW-[0-9]+)\)$ ]]; then
+                target=$(echo "${BASH_REMATCH[1]}" | xargs)
+                target_ticket="${BASH_REMATCH[2]}"
+              else
+                echo "  ❌ VALIDATION FAILED: Invalid target ticket in '$v' (expected branch(RDKEMW-12345))"
+                exit 1
+              fi
+            fi
+
+            if echo "$target" | grep -qiE '^(dummy_)?develop$'; then
+              b=$(echo "$target" | tr '[:upper:]' '[:lower:]')
               echo "  ✅ '$v' accepted → branch: $b"
-            elif echo "$v" | grep -qiE '^(support|release)/'; then
+            elif echo "$target" | grep -qiE '^(support|release)/'; then
               # Already a full branch path (e.g. "support/8.6.3.0") — use as-is.
-              b="$v"
+              b="$target"
               echo "  ✅ '$v' accepted as full branch path → branch: $b"
-            elif echo "$v" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
-              IFS='.' read -ra PARTS <<< "$v"
+            elif echo "$target" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+              IFS='.' read -ra PARTS <<< "$target"
               LEADING_ZERO=false
               for PART in "${PARTS[@]}"; do
                 if [[ "$PART" =~ ^0[0-9]+ ]]; then
@@ -188,15 +203,15 @@ jobs:
                 exit 1
               fi
               if [ "${#PARTS[@]}" -eq 3 ]; then
-                b="support/${v}.0"
+                b="support/${target}.0"
               else
-                b="support/${v}"
+                b="support/${target}"
               fi
               echo "  ✅ '$v' accepted → branch: $b"
-            elif git ls-remote --exit-code --heads origin "$v" > /dev/null 2>&1; then
+            elif git ls-remote --exit-code --heads origin "$target" > /dev/null 2>&1; then
               # Fallback: doesn't match any known shorthand, but an exact branch
               # with this name already exists on origin — accept it literally.
-              b="$v"
+              b="$target"
               echo "  ✅ '$v' accepted as existing branch → branch: $b"
             else
               echo "  ❌ VALIDATION FAILED: Invalid backport_to value '$v'"
@@ -208,7 +223,19 @@ jobs:
               echo "  └───────────────────────────────────────────────────────────┘"
               exit 1
             fi
+            if [[ -v SEEN_BRANCHES[$b] ]]; then
+              if [ "${SEEN_BRANCHES[$b]}" != "$target_ticket" ]; then
+                echo "  ❌ VALIDATION FAILED: Conflicting tickets for target '$b'"
+                exit 1
+              fi
+              echo "  ℹ️  Duplicate target '$b' ignored"
+              continue
+            fi
+            SEEN_BRANCHES[$b]="$target_ticket"
             SUPPORT_BRANCHES+=("$b")
+            if [ -n "$target_ticket" ]; then
+              echo "  ✅ Ticket for $b: $target_ticket (feature/$target_ticket)"
+            fi
           done
           echo ""
 

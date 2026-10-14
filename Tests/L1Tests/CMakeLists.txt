@@ -31,7 +31,7 @@ set (TEST_LIB
     ${NAMESPACE}Plugins::${NAMESPACE}Plugins
 )
 
-set (TEST_INC ../../helpers)
+set (TEST_INC)
 
 #########################################################################################
 # add_plugin_test_ex: Macro to add plugin tests, it will append to TEST_SRC, TEST_INC,
@@ -101,7 +101,7 @@ macro(add_plugin_test plugin_name test_files)
 endmacro()
 
 # PLUGIN_HDMICECSINK
-set (HDMICECSINK_INC ../../plugin ../../helpers)
+set (HDMICECSINK_INC ../../plugin ${CMAKE_SOURCE_DIR}/../entservices-helpers/helpers)
 set (HDMICECSINK_LIBS ${NAMESPACE}HdmiCecSink ${NAMESPACE}HdmiCecSinkImplementation)
 add_plugin_test_ex(PLUGIN_HDMICECSINK tests/test_HdmiCecSink.cpp "${HDMICECSINK_INC}" "${HDMICECSINK_LIBS}")
 

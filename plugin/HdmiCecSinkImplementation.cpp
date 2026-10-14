@@ -3717,6 +3717,7 @@ namespace WPEFramework
                 (*index)->OnKeyPressEvent(logicalAddress,keyCode);
                 index++;
               }
+		   LOGINFO("New log added ");
        }
     } // namespace Plugin
 } // namespace WPEFramework

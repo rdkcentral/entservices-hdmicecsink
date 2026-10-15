@@ -475,8 +475,8 @@ namespace WPEFramework
                         OpCode featureOpcode =  msg.feature;
             AbortReason abortReason = msg.reason;
 
-                        /* Using std::move on variables passed to reportFeatureAbortEvent is ineffective since reportFeatureAbortEvent takes const reference parameters */
-                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
+	                /* reportFeatureAbortEvent takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
+                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE, uninit_use_in_call : FALSE] */
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
                          if(msg.feature.opCode() == REQUEST_SHORT_AUDIO_DESCRIPTOR)
@@ -495,8 +495,8 @@ namespace WPEFramework
                 AbortReason reason = AbortReason::UNRECOGNIZED_OPCODE;
                 LogicalAddress logicaladdress =header.from.toInt();
                 OpCode feature = msg.opCode();
-                /* Using std::move on variables passed to sendFeatureAbort is ineffective since sendFeatureAbort takes const reference parameters */
-                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
+		/* sendFeatureAbort takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
+                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE, uninit_use_in_call : FALSE] */
                 HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else

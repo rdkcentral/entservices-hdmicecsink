@@ -185,7 +185,7 @@ namespace WPEFramework {
 
             void printVariable()
             {
-                LOGINFO("Device LogicalAddress %s", m_logicalAddress.toString().c_str());
+                LOGINFO("manipulate conflict %s", m_logicalAddress.toString().c_str());
                 LOGINFO("Device Type %s", m_deviceType.toString().c_str());
                 LOGINFO("Device Present %d", m_isDevicePresent);
                 LOGINFO("Active Source %d", m_isActiveSource);

@@ -3698,6 +3698,7 @@ namespace WPEFramework
           }
       else {
          LOGINFO("Error while fetching CEC Version from RFC ");
+		 LOGINFO("Unable to retrieve CEC Version from RFC.");
       }
       }
 

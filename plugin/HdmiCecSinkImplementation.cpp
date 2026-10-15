@@ -475,8 +475,9 @@ namespace WPEFramework
                         OpCode featureOpcode =  msg.feature;
             AbortReason abortReason = msg.reason;
 
-	                /* reportFeatureAbortEvent takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
-                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE, uninit_use_in_call : FALSE] */
+	                    /* reportFeatureAbortEvent takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
+                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
+                        /* coverity[uninit_use_in_call : FALSE] */
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
                          if(msg.feature.opCode() == REQUEST_SHORT_AUDIO_DESCRIPTOR)
@@ -495,8 +496,9 @@ namespace WPEFramework
                 AbortReason reason = AbortReason::UNRECOGNIZED_OPCODE;
                 LogicalAddress logicaladdress =header.from.toInt();
                 OpCode feature = msg.opCode();
-		/* sendFeatureAbort takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
-                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE, uninit_use_in_call : FALSE] */
+		        /* sendFeatureAbort takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
+                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
+                /* coverity[uninit_use_in_call : FALSE] */
                 HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
          else

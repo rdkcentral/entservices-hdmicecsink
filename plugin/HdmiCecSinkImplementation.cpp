@@ -2021,7 +2021,7 @@ namespace WPEFramework
 
             for( int i = 0; i < m_numofHdmiInput; i++ )
             {
-                bool isConnected = false;
+                bool isConnected = hdmiInputs[i].m_isConnected;
 
                 try
                 {
@@ -2032,12 +2032,10 @@ namespace WPEFramework
                 {
                     LOGWARN("HdmiInput::isPortConnected failed for port %d", i);
                     LOG_DEVICE_EXCEPTION0();
-                    isConnected = false;
                 }
                 catch (const std::exception& e)
                 {
                     LOGWARN("std::exception while checking HDMI port %d connection state: %s", i, e.what());
-                    isConnected = false;
                 }
 
                 hdmiInputs[i].update(isConnected);

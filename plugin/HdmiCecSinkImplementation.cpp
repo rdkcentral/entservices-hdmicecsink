@@ -709,7 +709,16 @@ namespace WPEFramework
             {
                 LOGERR("exception in thread join %s", e.what());
             }
-            // Close COM-RPC link (unregisters notification delegate internally)
+            // Unregister before Close() releases the cached sub-interface, otherwise DeviceSettings
+            // is left holding a dangling HDMI-In notification sink forever (resource leak) — Close()
+            // does NOT unregister notification sinks on our behalf.
+            {
+                auto* hdmiIn = DSHelper::AcquireSubInterface<Exchange::IDeviceSettingsHDMIIn>();
+                if (hdmiIn != nullptr) {
+                    hdmiIn->Unregister(&_dsHdmiInNotification);
+                    hdmiIn->Release();
+                }
+            }
             DSHelper::Close();
             HdmiCecSinkImplementation::_instance = nullptr;
             /* No device::Manager::DeInitialize() needed in COM-RPC path */

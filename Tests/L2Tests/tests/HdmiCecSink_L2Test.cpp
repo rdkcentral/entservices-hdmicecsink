@@ -18,13 +18,18 @@
  */
 #include "L2Tests.h"
 #include "L2TestsMock.h"
+#include <cerrno>
 #include <condition_variable>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <interfaces/IHdmiCecSink.h>
 // Used to change the power state for onpowermodechanged event
 #include <interfaces/IPowerManager.h>
+#include <unistd.h>
+#include <vector>
 
 #define EVNT_TIMEOUT (5000)
 #define HDMICECSINK_CALLSIGN _T("org.rdk.HdmiCecSink.1")
@@ -45,36 +50,122 @@ using IHdmiCecSinkActivePathIterator = WPEFramework::Exchange::IHdmiCecSink::IHd
 using PowerState = WPEFramework::Exchange::IPowerManager::PowerState;
 
 namespace {
+// Escalates to `sudo <argv...>` (already proven passwordless in this CI — see the historical use of
+// sudo for /etc/device.properties etc.) and returns whether it succeeded. Building the command from a
+// fixed argv array (rather than interpolating fileName into a single shell string) avoids any shell
+// quoting/injection concerns even though every caller here only ever passes fixed literals.
+static bool runSudo(const std::vector<std::string>& argv)
+{
+    std::string cmd = "sudo";
+    for (const auto& arg : argv) {
+        cmd += " \"";
+        cmd += arg;
+        cmd += "\"";
+    }
+    return system(cmd.c_str()) == 0;
+}
+
+// Deliberately does NOT special-case any path up front. Root-owned locations (e.g. anything under
+// /etc, or a not-yet-created /opt/persistent/... subtree) are not a fixed, enumerable set — the old
+// approach of hardcoding "these specific paths need sudo" is exactly the kind of workaround that
+// silently breaks again the next time a *different* protected path needs seeding (which is exactly
+// how the /etc/hostDataDefault bug this replaces went unnoticed for so long: it wasn't on anyone's
+// hardcoded list). Instead: always attempt the plain, unprivileged operation first, and only escalate
+// to sudo when that attempt has *actually, verifiably* failed. This is self-adapting to any path,
+// present or future, without maintaining a whitelist.
 static void removeFile(const char* fileName)
 {
-    // Use sudo for protected files
-    if (strcmp(fileName, "/etc/device.properties") == 0 || strcmp(fileName, "/opt/persistent/ds/cecData_2.json") == 0 || strcmp(fileName, "/opt/uimgr_settings.bin") == 0) {
-        char cmd[256];
-        snprintf(cmd, sizeof(cmd), "sudo rm -f %s", fileName);
-        int ret = system(cmd);
-        if (ret != 0) {
-            printf("File %s failed to remove with sudo\n", fileName);
-            perror("Error deleting file");
-        } else {
-            printf("File %s successfully deleted with sudo\n", fileName);
-        }
-    } else {
-        if (std::remove(fileName) != 0) {
-            printf("File %s failed to remove\n", fileName);
-            perror("Error deleting file");
-        } else {
-            printf("File %s successfully deleted\n", fileName);
-        }
+    if (std::remove(fileName) == 0) {
+        printf("File %s successfully deleted\n", fileName);
+        return;
     }
+    if (errno == ENOENT) {
+        // Nothing to delete — not an error worth escalating for.
+        return;
+    }
+    if (runSudo({"rm", "-f", fileName})) {
+        printf("File %s successfully deleted with sudo\n", fileName);
+    } else {
+        printf("File %s failed to remove even with sudo\n", fileName);
+    }
+}
+
+static bool tryPlainWrite(const char* fileName, const std::string& content)
+{
+    std::ofstream fileContentStream(fileName);
+    fileContentStream << content;
+    fileContentStream.close();
+    // std::ofstream does not throw on open()/write() failure by default — it silently sets failbit,
+    // so this explicit check is required; without it a failed write is indistinguishable from success
+    // (which is exactly how the original /etc/hostDataDefault bug went unnoticed: no exception, no
+    // error, just an empty/non-existent file and a downstream consumer reporting "loaded 0 default
+    // properties" with no indication of why).
+    return !fileContentStream.fail();
 }
 
 static void createFile(const char* fileName, const char* fileContent)
 {
-    std::ofstream fileContentStream(fileName);
-    fileContentStream << fileContent;
-    fileContentStream << "\n";
-    fileContentStream.close();
+    const std::string contentWithNewline = std::string(fileContent) + "\n";
+
+    // Fast path: succeeds whenever the destination is already writable by the current unprivileged
+    // CI user (an existing file the workflow already `sudo chmod 777`'d, or any path we plainly own).
+    if (tryPlainWrite(fileName, contentWithNewline)) {
+        printf("File %s successfully created\n", fileName);
+        return;
+    }
+
+    // Slow path: the plain write genuinely failed (new file under a root-owned directory, or a
+    // not-yet-created parent directory). Stage the content in /tmp (always writable) and move it into
+    // place with sudo, creating the parent directory first since sudo cp does not do that itself.
+    char tmpName[] = "/tmp/createFileXXXXXX";
+    int fd = mkstemp(tmpName);
+    if (fd == -1) {
+        printf("File %s failed to create: could not create temp staging file\n", fileName);
+        perror("Error creating temp file");
+        return;
+    }
+    ssize_t written = write(fd, contentWithNewline.c_str(), contentWithNewline.size());
+    close(fd);
+    if (written < 0 || static_cast<size_t>(written) != contentWithNewline.size()) {
+        printf("File %s failed to create: could not write temp staging file\n", fileName);
+        perror("Error writing temp file");
+        std::remove(tmpName);
+        return;
+    }
+
+    std::string parentDir = fileName;
+    size_t lastSlash = parentDir.find_last_of('/');
+    parentDir = (lastSlash == std::string::npos) ? "." : parentDir.substr(0, lastSlash);
+
+    bool ok = runSudo({"mkdir", "-p", parentDir})
+        && runSudo({"cp", tmpName, fileName})
+        && runSudo({"chmod", "666", fileName});
+    std::remove(tmpName);
+
+    if (ok) {
+        printf("File %s successfully created with sudo (plain write was not permitted)\n", fileName);
+    } else {
+        printf("File %s failed to create even with sudo\n", fileName);
+    }
 }
+
+// Seeded at static-init time (before any TEST_F body or DeviceSettings activation ever runs) so the ARC
+// port id lookup succeeds on the very first activation, regardless of exactly when/which component first
+// touches device::HostPersistence's underlying singleton. Without this, GetAudioHDMIARCPortId() falls
+// back to -1, HdmiArcPortID stays -1, and HdmiCecSinkProcessor::process(const InitiateArc&, ...) returns
+// before Process_InitiateArc() is ever invoked (see InjectInitiateAndTerminateArcFrameAndVerifyEvent) —
+// note that test does NOT need the physical address value itself to be correct, only non-(-1): the
+// InitiateArc handler treats a never-registered device (the default state of every deviceList[] entry,
+// see CECDeviceParams::clear()) as an automatic match via its "invalid address" fallback branch.
+static bool g_hostDataDefaultSeeded = []() {
+    createFile("/etc/hostDataDefault", "HDMIARC.port.Id\t0");
+    return true;
+}();
+
+// The real ds-hal only invokes dsHdmiInRegisterConnectCB once for the lifetime of the test binary
+// (guarded by static HAL init state that survives DeviceSettings plugin deactivate/reactivate cycles),
+// so this must be captured process-wide rather than reset per test fixture instance.
+static dsHdmiInConnectCB_t g_dsHdmiInConnectCB = nullptr;
 }
 
 // Event flags for different CEC events
@@ -340,11 +431,9 @@ protected:
     Exchange::IHdmiCecSink* m_cecSinkPlugin = nullptr;
     PluginHost::IShell* m_controller_cecSink = nullptr;
     Core::Sink<HdmiCecSinkNotificationHandler> m_notificationHandler;
-    IARM_EventHandler_t dsHdmiEventHandler;
     IARM_EventHandler_t powerEventHandler = nullptr;
     FrameListener* registeredListener = nullptr;
     std::vector<FrameListener*> listeners;
-    device::Host::IHdmiInEvents* g_registeredHdmiInListener = nullptr;
 
     Core::ProxyType<RPC::InvokeServerType<1, 0, 4>> HdmiCecSink_Engine;
     Core::ProxyType<RPC::CommunicatorClient> HdmiCecSink_Client;
@@ -362,6 +451,7 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     createFile("/etc/device.properties", "RDK_PROFILE=TV");
     createFile("/opt/persistent/ds/cecData_2.json", "0");
     createFile("/tmp/pwrmgr_restarted", "2");
+    // /etc/hostDataDefault (HDMIARC.port.Id) is seeded once at static-init time — see g_hostDataDefaultSeeded.
 
     // Add sleep to ensure file is properly written to disk
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -445,14 +535,11 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
     ON_CALL(*p_messageEncoderMock, encode(::testing::Matcher<const UserControlPressed&>(::testing::_)))
         .WillByDefault(::testing::ReturnRef(CECFrame::getInstance()));
 
-    ON_CALL(*p_iarmBusImplMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInRegisterConnectCB(::testing::_))
         .WillByDefault(::testing::Invoke(
-            [&](const char* ownerName, IARM_EventId_t eventId, IARM_EventHandler_t handler) {
-                if ((string(IARM_BUS_DSMGR_NAME) == string(ownerName)) && (eventId == IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG)) {
-                    EXPECT_TRUE(handler != nullptr);
-                    dsHdmiEventHandler = handler;
-                }
-                return IARM_RESULT_SUCCESS;
+            [&](dsHdmiInConnectCB_t cbFunc) {
+                g_dsHdmiInConnectCB = cbFunc;
+                return dsERR_NONE;
             }));
 
     ON_CALL(*p_connectionMock, addFrameListener(::testing::_))
@@ -461,38 +548,36 @@ HdmiCecSink_L2Test::HdmiCecSink_L2Test()
             this->listeners.push_back(listener);
         });
 
-    EXPECT_CALL(*p_hostImplMock, Register(::testing::A<device::Host::IHdmiInEvents*>()))
-        .WillOnce(::testing::Invoke(
-            [&](device::Host::IHdmiInEvents* listener) -> dsError_t {
-                this->g_registeredHdmiInListener = listener;
-                fprintf(stderr, "[TEST MOCK] Host::Register captured listener=%p\n", static_cast<void*>(listener));
-                fflush(stderr);
-                return static_cast<dsError_t>(0);
-            }));
-
     ON_CALL(*p_connectionMock, open())
         .WillByDefault(::testing::Return());
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getNumberOfInputs())
-        .WillRepeatedly(::testing::Return(3));
-
-    ON_CALL(*p_hdmiInputImplMock, isPortConnected(::testing::_))
-        .WillByDefault(::testing::Invoke(
-            [](int8_t port) {
-                return port == 1 ? true : false;
-            }));
-
-    EXPECT_CALL(*p_hdmiInputImplMock, getHDMIARCPortId(::testing::_))
-        .Times(::testing::AtLeast(1))
+    EXPECT_CALL(*p_dsHdmiInHalMock, dsHdmiInGetNumberOfInputs(::testing::_))
         .WillRepeatedly(::testing::Invoke(
-            [](int& portId) -> dsError_t {
-                fprintf(stderr, "[TEST MOCK] getHDMIARCPortId called (expectation)\n");
-                portId = 1;
-                return static_cast<dsError_t>(0);
+            [](uint8_t* pNumberOfinputs) {
+                *pNumberOfinputs = 3;
+                return dsERR_NONE;
             }));
+
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInGetStatus(::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](dsHdmiInStatus_t* pStatus) {
+                memset(pStatus, 0, sizeof(dsHdmiInStatus_t));
+                pStatus->isPortConnected[dsHDMI_IN_PORT_1] = true;
+                return dsERR_NONE;
+            }));
+
+    // Set up expectations for PowerManager termination (will be called in destructor)
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
+        .WillOnce(::testing::Return(PWRMGR_SUCCESS));
+
+    EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
+        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
 
     /* Activate plugin in constructor */
     status = ActivateService("org.rdk.PowerManager");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
+    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     status = ActivateService("org.rdk.HdmiCecSink");
@@ -519,12 +604,10 @@ HdmiCecSink_L2Test::~HdmiCecSink_L2Test()
     status = DeactivateService("org.rdk.HdmiCecSink");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
-    EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
-        .WillOnce(::testing::Return(PWRMGR_SUCCESS));
+    status = DeactivateService("org.rdk.DeviceSettings");
+    EXPECT_EQ(Core::ERROR_NONE, status);
 
-    EXPECT_CALL(*p_powerManagerHalMock, PLAT_DS_TERM())
-        .WillOnce(::testing::Return(DEEPSLEEPMGR_SUCCESS));
-
+    // PLAT_TERM and PLAT_DS_TERM expectations are now set in constructor
     status = DeactivateService("org.rdk.PowerManager");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
@@ -548,7 +631,6 @@ protected:
     Exchange::IHdmiCecSink* m_cecSinkPlugin = nullptr;
     PluginHost::IShell* m_controller_cecSink = nullptr;
     Core::Sink<HdmiCecSinkNotificationHandler> m_notificationHandler;
-    IARM_EventHandler_t dsHdmiEventHandler;
     IARM_EventHandler_t powerEventHandler = nullptr;
     FrameListener* registeredListener = nullptr;
     std::vector<FrameListener*> listeners;
@@ -651,14 +733,11 @@ HdmiCecSink_L2Test_STANDBY::HdmiCecSink_L2Test_STANDBY()
     ON_CALL(*p_messageEncoderMock, encode(::testing::Matcher<const UserControlPressed&>(::testing::_)))
         .WillByDefault(::testing::ReturnRef(CECFrame::getInstance()));
 
-    ON_CALL(*p_iarmBusImplMock, IARM_Bus_RegisterEventHandler(::testing::_, ::testing::_, ::testing::_))
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInRegisterConnectCB(::testing::_))
         .WillByDefault(::testing::Invoke(
-            [&](const char* ownerName, IARM_EventId_t eventId, IARM_EventHandler_t handler) {
-                if ((string(IARM_BUS_DSMGR_NAME) == string(ownerName)) && (eventId == IARM_BUS_DSMGR_EVENT_HDMI_IN_HOTPLUG)) {
-                    EXPECT_TRUE(handler != nullptr);
-                    dsHdmiEventHandler = handler;
-                }
-                return IARM_RESULT_SUCCESS;
+            [&](dsHdmiInConnectCB_t cbFunc) {
+                g_dsHdmiInConnectCB = cbFunc;
+                return dsERR_NONE;
             }));
 
     ON_CALL(*p_connectionMock, addFrameListener(::testing::_))
@@ -670,24 +749,26 @@ HdmiCecSink_L2Test_STANDBY::HdmiCecSink_L2Test_STANDBY()
     ON_CALL(*p_connectionMock, open())
         .WillByDefault(::testing::Return());
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getNumberOfInputs())
-        .WillRepeatedly(::testing::Return(3));
-
-    ON_CALL(*p_hdmiInputImplMock, isPortConnected(::testing::_))
-        .WillByDefault(::testing::Invoke(
-            [](int8_t port) {
-                return port == 1 ? true : false;
+    EXPECT_CALL(*p_dsHdmiInHalMock, dsHdmiInGetNumberOfInputs(::testing::_))
+        .WillRepeatedly(::testing::Invoke(
+            [](uint8_t* pNumberOfinputs) {
+                *pNumberOfinputs = 3;
+                return dsERR_NONE;
             }));
 
-    EXPECT_CALL(*p_hdmiInputImplMock, getHDMIARCPortId(::testing::_))
-        .WillRepeatedly(::testing::Invoke(
-            [](int& portId) -> dsError_t {
-                portId = 1;
-                return static_cast<dsError_t>(0);
+    ON_CALL(*p_dsHdmiInHalMock, dsHdmiInGetStatus(::testing::_))
+        .WillByDefault(::testing::Invoke(
+            [](dsHdmiInStatus_t* pStatus) {
+                memset(pStatus, 0, sizeof(dsHdmiInStatus_t));
+                pStatus->isPortConnected[dsHDMI_IN_PORT_1] = true;
+                return dsERR_NONE;
             }));
 
     /* Activate plugin in constructor */
     status = ActivateService("org.rdk.PowerManager");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
+    status = ActivateServiceWithRetry("org.rdk.DeviceSettings", 3, 500);
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     status = ActivateService("org.rdk.HdmiCecSink");
@@ -705,6 +786,9 @@ HdmiCecSink_L2Test_STANDBY::~HdmiCecSink_L2Test_STANDBY()
 
     // Deactivate services in reverse order
     status = DeactivateService("org.rdk.HdmiCecSink");
+    EXPECT_EQ(Core::ERROR_NONE, status);
+
+    status = DeactivateService("org.rdk.DeviceSettings");
     EXPECT_EQ(Core::ERROR_NONE, status);
 
     EXPECT_CALL(*p_powerManagerHalMock, PLAT_TERM())
@@ -1884,10 +1968,13 @@ TEST_F(HdmiCecSink_L2Test, Hdmihotplug_COMRPC_PlugIn_and_PlugOut)
         if (m_controller_cecSink) {
             EXPECT_TRUE(m_cecSinkPlugin != nullptr);
             if (m_cecSinkPlugin) {
-                ASSERT_NE(g_registeredHdmiInListener, nullptr);
-                g_registeredHdmiInListener->OnHdmiInEventHotPlug(dsHDMI_IN_PORT_1, true);
+                // Simulate the physical hotplug via the real DsHdmiInHalMock-registered callback so the
+                // event genuinely round-trips through the real DeviceSettings plugin -> COM-RPC
+                // notification -> HdmiCecSinkImplementation, exactly like production hardware would.
+                ASSERT_NE(g_dsHdmiInConnectCB, nullptr);
+                g_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, true);
                 std::this_thread::sleep_for(std::chrono::seconds(2));
-                g_registeredHdmiInListener->OnHdmiInEventHotPlug(dsHDMI_IN_PORT_1, false);
+                g_dsHdmiInConnectCB(dsHDMI_IN_PORT_1, false);
                 m_cecSinkPlugin->Release();
             }
             m_controller_cecSink->Release();

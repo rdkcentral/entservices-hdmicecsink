@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Inject RequestActiveSource
+  message:
+    user_defined: true
+    payload: ["0x5F", "0x85"]

@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Inject UserControlPressed
+  message:
+    user_defined: true
+    payload: ["0x50", "0x44", "0x41"]

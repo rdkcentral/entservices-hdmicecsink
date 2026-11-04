@@ -1,0 +1,14 @@
+HdmiCec:
+  command: update_device_status
+  description: Clear emulated HAL open failure for post-condition cleanup
+  device:
+    # name is the EMULATED DEVICE - the device under test itself, not a peer. This document
+    # CLEARS an emulated HAL open failure on the CEC adapter the sink plugin opens (fault: no);
+    # Device_Setapi_Open_Fail.yaml is the one that injects it. Both must name the identity
+    # config.emulated_device pins in Device_Config.yaml, Device_Config_Add_Network.yaml and
+    # ../hdmicec/hdmicec_vcomponent_configuration.yaml, which is the television VTV. A name absent
+    # from the device map resolves to nothing, so the fault would neither be cleared nor injected -
+    # and the vComponent reports that as success.
+    name: "VTV"
+    power_status: "on"
+    fault: no

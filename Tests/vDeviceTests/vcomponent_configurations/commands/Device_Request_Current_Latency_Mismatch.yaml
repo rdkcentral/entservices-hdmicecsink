@@ -1,0 +1,6 @@
+HdmiCec:
+  command: cec_message
+  description: Inject RequestCurrentLatency - mismatched physical address
+  message:
+    user_defined: true
+    payload: ["0x50", "0xA7", "0x20", "0x00"]

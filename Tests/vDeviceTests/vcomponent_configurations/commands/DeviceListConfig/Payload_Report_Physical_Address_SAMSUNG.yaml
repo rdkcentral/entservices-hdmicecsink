@@ -1,0 +1,11 @@
+HdmiCec:
+  command: "cec_message"
+  description: "Trigger process(ReportPhysicalAddress) from SAMSUNG (LA=3, Tuner) at 1.0.0.0"
+  message:
+    user_defined: true
+    # Header 0x3F: initiator=3 (SAMSUNG), destination=0xF (broadcast)
+    # Opcode 0x84: ReportPhysicalAddress
+    # Physical 1.0.0.0 -> 0x10,0x00, device_type Tuner=0x03
+    # 1.0.0.0 is the television's FIRST HDMI input, which is input index 0: the sink matches a peer
+    # to an input by comparing the address's first nibble against m_portID + 1.
+    payload: ["0x3F", "0x84", "0x10", "0x00", "0x03"]

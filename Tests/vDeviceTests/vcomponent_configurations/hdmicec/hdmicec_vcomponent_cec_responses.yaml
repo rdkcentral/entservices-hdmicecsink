@@ -1,0 +1,155 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# EVERY OPCODE NAME BELOW IS A NAME THE vCOMPONENT'S PARSER ACTUALLY KNOWS.
+#
+# The emulator resolves these strings through vcCommand_GetOpCode, which looks them up in
+# gOpCodeStrVal (rdk-halif-test-hdmi_cec/vcomponent/src/vcCommand.c:27-83 - 55 names, spelled by the
+# CMD_* macros in vcCommand.h). The VOCABULARY IS 55 NAMES, NOT 57: vcCommand.h defines 57 CMD_*
+# string macros, two of which are not rows of that table - CMD_HOTPLUG ("HotPlug") is an opcode
+# spelling the table does not carry, and CMD_DATA_OSD_NAME ("osd_name") is a payload-symbol key
+# rather than an opcode - so the macro count is not the size of the vocabulary. A name outside
+# that table resolves to CEC_OPCODE_UNKNOWN, and
+# ParseCommand then logs "Opcode[<name>] Unknown" and RETURNS WITHOUT SENDING ANYTHING
+# (vcHdmiCec.c:180-184). That failure is silent from a test's point of view: the post is accepted,
+# HTTP 200 comes back, and the exchange the row describes simply never happens - so a row written
+# in a name the parser does not know is worse than no row at all, because it reads like coverage.
+#
+# ELEVEN NAMES WERE WRITTEN HERE THAT THE PARSER DOES NOT KNOW. Two of them had an exact supported
+# spelling and now use it:
+#   GiveFeatures   -> GiveDeviceFeature    (CMD_GIVE_DEVICE_FEATURE,   <Give Features>  0xA5)
+#   ReportFeatures -> ReportDeviceFeature  (CMD_REPORT_DEVICE_FEATURE, <Report Features> 0xA6)
+# One was an unsupported synonym of a row that already existed - "GetCecVersion" alongside the
+# supported "GiveCecVersion", which is the name gOpCodeStrVal carries for 0x9F - so the duplicate
+# is gone and the supported row below is the one that answers.
+#
+# The remaining eight have NO spelling in the vComponent's vocabulary at all, so the exchanges they
+# described cannot be expressed and their rows are not present:
+#   GetMenuLanguage             <Get Menu Language>              0x91
+#   GiveLatency / ReportLatency / ReportCurrentLatency / RequestCurrentLatency
+#                               the latency exchange              0xA7 / 0xA8
+#   ReportAudioStatus           <Report Audio Status>            0x7A
+#   RequestShortAudioDescriptor / ReportShortAudioDescriptor
+#                               the short-audio-descriptor exchange 0xA4 / 0xA3
+# The sink plugin does implement handlers for several of these, so the gap is in the EMULATOR's
+# vocabulary rather than in the plugin. BLOCKED - REQUIRED PRODUCTION CHANGE, REPORTED NOT MADE
+# (AAP Directive 6): each one needs a CMD_* string macro in
+# rdk-halif-test-hdmi_cec/vcomponent/src/vcCommand.h plus a { CMD_x, (int) CEC_x } row in
+# gOpCodeStrVal, and rdk-halif-test-hdmi_cec/** is read-only for this pass (AAP Sec. 0.10.2). Until
+# that lands, the latency, audio-status and short-audio-descriptor exchanges are driven from the
+# ../commands/*.yaml raw user_defined frames instead, which carry their bytes directly and bypass
+# the name table entirely.
+#
+# THE CONSTRAINT IS ENFORCED, NOT JUST DESCRIBED, AND HERE IS THE MECHANISM BY NAME.
+# utils.SUPPORTED_VCOMPONENT_OPCODES carries the same 55 names, derived from that table and listed
+# in its order. TCID33_Process_Yaml_Health_Check._verify_response_table_opcodes() reads this file
+# with its comment lines stripped - so the BLOCKED names written in prose above are not mistaken
+# for rows - and refuses three things: an opcode name that is not a member of the vocabulary, a
+# request or response half written as a mapping without an opcode key, and a document that
+# declares no opcode at all, which would let a membership check pass while asserting nothing. It
+# runs from run_test() beside the two fixture-inventory checks, BEFORE the sweep posts anything.
+# So a row added later in a name the parser cannot resolve fails a test rather than going quietly
+# missing at run time, and this paragraph can be checked rather than believed.
+HdmiCec:
+  cec_messages:
+    # Role-independent exchanges carried over from the HdmiCecSource template.
+    - request: { opcode: "ImageViewOn", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "TextViewOn", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "SetMenuLanguage", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "Standby", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "SetOsdName", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "SetOsdString", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "ActiveSource", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "ReportPhysicalAddress", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "DeviceVendorId", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "ReportPowerStatus", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "CecVersion", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "GiveOsdName", type: "Direct", payload: null}
+      response: { opcode: "SetOsdName", type: "Direct", payload: ["osd_name"]}
+    - request: { opcode: "GivePhysicalAddress", type: "Direct", payload: null}
+      response: { opcode: "ReportPhysicalAddress", type: "Broadcast", payload: ["physical_address", "device_type"]}
+    - request: { opcode: "RequestActiveSource", type: "Broadcast", payload: null}
+      response: { opcode: "ActiveSource", type: "Broadcast", payload: ["physical_address"]}
+    # The REQUEST is directed - the sink asks one peer - but the REPLY MUST BE BROADCAST, and
+    # that asymmetry is imposed by the device under test rather than chosen here.
+    # HdmiCecSinkProcessor::process(DeviceVendorID) opens on
+    #     if(!(header.to == LogicalAddress(LogicalAddress::BROADCAST))) { return; }
+    # (HdmiCecSinkImplementation.cpp:380-383), so a directed <Device Vendor ID> is discarded
+    # before addDevice() or the vendorID update is reached: the peer would answer, the exchange
+    # would look correct, and the sink would learn nothing. The reply is broadcast in HDMI-CEC
+    # 1.4b too - <Device Vendor ID> is defined as a broadcast message - so the wire protocol and
+    # the sink's guard agree. Compare the GiveOsdName row above, where the polarity is the
+    # opposite: process(SetOSDName) discards BROADCAST and accepts only a directed reply.
+    - request: { opcode: "GiveDeviceVendorId", type: "Direct", payload: null}
+      response: { opcode: "DeviceVendorId", type: "Broadcast", payload: ["vendor_id"]}
+    - request: { opcode: "GiveDevicePowerStatus", type: "Direct", payload: null}
+      response: { opcode: "ReportPowerStatus", type: "Direct", payload: ["power_status"]}
+    - request: { opcode: "GiveCecVersion", type: "Direct", payload: null}
+      response: { opcode: "CecVersion", type: "Direct", payload: ["cec_version"]}
+    # Sink-only ARC, audio and version exchanges; replies are Direct because the sink discards broadcast ones.
+    - request: { opcode: "RequestArcInitiation", type: "Direct", payload: null}
+      response: { opcode: "InitiateArc", type: "Direct", payload: null}
+    - request: { opcode: "RequestArcTermination", type: "Direct", payload: null}
+      response: { opcode: "TerminateArc", type: "Direct", payload: null}
+    - request: { opcode: "SystemAudioModeRequest", type: "Direct", payload: null}
+      response: { opcode: "SetSystemAudioMode", type: "Direct", payload: null}
+    # <Give Audio Status> is declared so the emulator recognises the request, but with NO reply.
+    # The reply the CEC specification pairs with it is <Report Audio Status> (0x7A), and
+    # "ReportAudioStatus" is not a name gOpCodeStrVal knows, so an emulated reply cannot be
+    # expressed here - see the vocabulary note in this file's header.
+    - request: { opcode: "GiveAudioStatus", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "GiveSystemAudioModeStatus", type: "Direct", payload: null}
+      response: { opcode: "SystemAudioModeStatus", type: "Direct", payload: null}
+    # Sink-only opcodes the peer absorbs without replying, including the sink's own ARC reports.
+    - request: { opcode: "ReportArcInitiated", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "ReportArcTerminated", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "ReportDeviceFeature", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "GiveDeviceFeature", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "InactiveSource", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "UserControlPressed", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "UserControlReleased", type: "Direct", payload: null}
+      response: null
+    - request: { opcode: "RoutingChange", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "RoutingInformation", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "SetStreamPath", type: "Broadcast", payload: null}
+      response: null
+    - request: { opcode: "FeatureAbort", type: "Direct", payload: null}
+      response: null

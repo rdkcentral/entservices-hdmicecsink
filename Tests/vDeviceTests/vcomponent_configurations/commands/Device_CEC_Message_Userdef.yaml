@@ -1,0 +1,94 @@
+#** *****************************************************************************
+# *
+# * If not stated otherwise in this file or this component's LICENSE file the
+# * following copyright and licenses apply:
+# *
+# * Copyright 2023 RDK Management
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# * http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# *
+#* ******************************************************************************
+# Injects an ActiveSource announcement onto the emulated CEC bus as a raw byte
+# sequence, as though the emulated peer had just claimed the bus. This is the
+# most reusable frame-injection document in the folder, because
+# HdmiCecSinkProcessor::process(ActiveSource) forwards to BOTH
+# addDevice(header.from.toInt()) and updateActiveSource(header.from.toInt(),
+# msg): one post therefore drives device registration, active-source tracking -
+# m_currentActiveSource, and the m_isActiveSource flag moving off whichever
+# device held it - and the OnActiveSourceChange notification, plus
+# OnWakeupFromStandby when the peer is already present and the panel itself is
+# in standby.
+#
+# THE HEADER BYTE IS 0x5F, AND IT IS DELIBERATELY NOT 0x50. Do not "correct" it
+# against the source plugin's document this file was modelled on, and do not
+# harmonise it with the directed fixtures sitting beside it. Either change
+# turns this document into a silent no-op, because process(ActiveSource) opens
+# on an inverse-polarity guard:
+#
+#     if(!(header.to == LogicalAddress(LogicalAddress::BROADCAST))){
+#         LOGINFO("Ignore Direct messages, accepts only broadcast messages");
+#         return; }
+#
+# A directed destination nibble returns before either call is reached, while
+# the vComponent still answers HTTP 200 - which is precisely what makes the
+# mistake invisible: the post succeeds and nothing whatsoever happens. Only
+# three other sink handlers share that polarity - process(RequestActiveSource),
+# process(ReportPhysicalAddress) and process(DeviceVendorID) - and their
+# documents carry broadcast framing for the same reason. The neighbouring
+# Device_Give_* documents are right to use 0x50: they are directed requests
+# addressed to the sink itself, which answers on LogicalAddress::TV == 0 as
+# claimed by allocateLAforTV(). process(ImageViewOn), process(TextViewOn) and
+# process(InActiveSource) invert the test once more and reject broadcast
+# outright, so a fixture for any of those must stay directed.
+#
+# Payload, byte by byte:
+#   0x5F  header = (initiator << 4) | destination
+#         = (AUDIO_SYSTEM 5 << 4) | BROADCAST 0xF. Initiator 5 is the YAMAHA
+#         audio-system PEER, declared beneath the television in
+#         Device_Config_Add_Network.yaml; 5 is the one logical address
+#         vcDevice_AllocateLogicalAddress offers an AudioSystem, so the address
+#         follows from the declared role rather than being chosen here.
+#         (../hdmicec/hdmicec_vcomponent_configuration.yaml pins something
+#         different and must not be read as the source of this address: it
+#         declares the emulated DEVICE UNDER TEST, the television VTV.)
+#         LogicalAddress::BROADCAST is an alias of UNREGISTERED == 15.
+#   0x82  ACTIVE_SOURCE. Not 0x9D, which is INACTIVE_SOURCE and takes the
+#         opposite guard.
+#   0x20  A PhysicalAddress operand: two bytes carrying two nibbles each, so
+#   0x00  the pair reads 2.0.0.0 - the initiator's OWN address, as
+#         Device_Config_Add_Network.yaml allocates it to the audio system on
+#         HDMI input 1. The operand is not decorative: process(ActiveSource)
+#         forwards it to updateActiveSource, which writes it into
+#         deviceList[5].m_physicalAddr. An operand naming any other address
+#         therefore MOVES the audio system, and moving it off the ARC port's
+#         address disables process(const InitiateArc &, const Header &)
+#         altogether. Keep this pair equal to the operand in
+#         DeviceListConfig/Payload_Report_Physical_Address_AudioSystem.yaml.
+#
+# AVAILABLE FIXTURE, NO CURRENT CONSUMER. No test case in this suite posts this
+# document; the cases that need an ActiveSource announcement post
+# Process_Active_Source.yaml instead, which carries the same opcode and operand
+# from initiator 4. This document is available for a case that wants the frame
+# from initiator 5, and the filename is part of the contract for any case that
+# posts it: utils.HDMICEC_CMD_BASE resolves to this directory and the bare
+# basename is joined onto it, while utils.send_vcomponent_command() reports a
+# missing document as code 0 rather than raising - so a renamed file would not
+# fail loudly, it would quietly drop the injection step. Note the abbreviated
+# "Userdef", which distinguishes this raw-byte document from the symbolic
+# Device_CEC_Message form of the same injection.
+HdmiCec:
+  command: cec_message
+  description: Inject ActiveSource (CEC opcode 0x82) - user-defined CEC message / active source announcement
+  message:
+    user_defined: true
+    payload: ["0x5F", "0x82", "0x20", "0x00"]

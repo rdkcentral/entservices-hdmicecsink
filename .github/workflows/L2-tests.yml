@@ -122,7 +122,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-devicesettings
           path: entservices-devicesettings
-          ref: topic/RDKEMW-25013
+          ref: develop
 
       # dsTypes.h/dsHdmiIn.h HAL header contract (not the legacy libds/IARM implementation,
       # which entservices-devicesettings no longer depends on). Stable tag 6.0.1 to avoid

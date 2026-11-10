@@ -12,7 +12,7 @@ env:
   BUILD_TYPE: Debug
   THUNDER_TOOLS_COMMIT_SHA: "d5dd83c7c19c49c7f25c558c126500bd2d64f7a4"
   THUNDER_COMMIT_SHA: "2c0fcc5529e7da734be558ca6efa05d934dcce31"
-  INTERFACES_REF: "develop"
+  INTERFACES_REF: "4.3.8"
   AUTOMATICS_UNAME: ${{ secrets.AUTOMATICS_UNAME}}
   AUTOMATICS_PASSCODE: ${{ secrets. AUTOMATICS_PASSCODE}}
 
@@ -112,7 +112,7 @@ jobs:
         with:
           repository: rdkcentral/entservices-testframework
           path: entservices-testframework
-          ref: 2.1.0
+          ref: 2.1.3
 
       # HdmiCecSink talks to DeviceSettings over COM-RPC for HDMI-In port state and ARC port id.
       # The real entservices-devicesettings plugin is built and activated in the L2 test; its
@@ -646,9 +646,11 @@ jobs:
           -Werror -Wall -Wno-unused-result -Wno-deprecated-declarations -Wno-error=format=
           -Wl,--no-as-needed
           -DUSE_IARMBUS
+          -DDEVICESETTINGS_PLUGIN_MOCKS
           -DRDK_SERVICE_L2_TEST
           -DDISABLE_SECURITY_TOKEN
           -DENABLE_THERMAL_PROTECTION"
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed -L$GITHUB_WORKSPACE/install/usr/lib -lds-hal"
           -DPLUGIN_PERSISTENTSTORE_PATH="/tmp/secure/persistent/rdkservicestore"
           -DPLUGIN_PERSISTENTSTORE_LEGACYPATH="/tmp/persistent/rdkservicestore"
           -DCOMCAST_CONFIG=OFF

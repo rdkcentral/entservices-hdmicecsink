@@ -150,7 +150,9 @@ Event Notification (arcInitiationEvent)
    - Hardware-level CEC protocol handling
    - Logical address allocation
 
-### Internal Utilities (helpers/)
+### Shared Utilities (entservices-helpers)
+
+The plugin depends on the external **entservices-helpers** component for common utility functions:
 
 - **UtilsIarm.h**: IARM bus communication helpers
 - **UtilsJsonRpc.h**: JSONRPC utility functions
@@ -160,6 +162,11 @@ Event Notification (arcInitiationEvent)
 - **UtilsgetRFCConfig.h**: RFC (Remote Feature Control) configuration
 - **UtilsBIT.h**: Bit manipulation utilities
 - **UtilsThreadRAII.h**: Thread management helpers
+- **tptimer.h**: Timer utilities
+- **PowerManagerInterface.h**: Power management interface helpers
+- **PluginInterfaceBuilder.h**: Plugin interface construction utilities
+
+These utilities are provided by the **entservices-helpers** library, which is a build-time dependency shared across multiple entservices components.
 
 ## Threading Model
 

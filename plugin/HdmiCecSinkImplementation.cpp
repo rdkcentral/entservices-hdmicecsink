@@ -474,9 +474,9 @@ namespace WPEFramework
             LogicalAddress logicaladdress = header.from.toInt();
                         OpCode featureOpcode =  msg.feature;
             AbortReason abortReason = msg.reason;
-
+                        /* Using std::move on variables passed to reportFeatureAbortEvent is ineffective since reportFeatureAbortEvent takes const reference parameters */
+		                /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */ 
 	                    /* reportFeatureAbortEvent takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
-                        /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
                         /* coverity[uninit_use_in_call : FALSE] */
                         HdmiCecSinkImplementation::_instance->reportFeatureAbortEvent(logicaladdress,featureOpcode,abortReason);
 
@@ -496,8 +496,9 @@ namespace WPEFramework
                 AbortReason reason = AbortReason::UNRECOGNIZED_OPCODE;
                 LogicalAddress logicaladdress =header.from.toInt();
                 OpCode feature = msg.opCode();
-		        /* sendFeatureAbort takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
+                /* Using std::move on variables passed to sendFeatureAbort is ineffective since sendFeatureAbort takes const reference parameters */
                 /* coverity[COPY_INSTEAD_OF_MOVE : FALSE] */
+		        /* sendFeatureAbort takes its params by value from external ccec types (LogicalAddress/OpCode/AbortReason) whose converting-constructor bodies aren't visible to Coverity: std::move is a no-op here (the params are reused nowhere else, but the copy ctor is still invoked) and the "impl" member is conservatively flagged as uninitialized */
                 /* coverity[uninit_use_in_call : FALSE] */
                 HdmiCecSinkImplementation::_instance->sendFeatureAbort(logicaladdress, feature,reason);
          }
